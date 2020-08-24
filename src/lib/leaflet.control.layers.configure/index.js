@@ -83,6 +83,58 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     return;
                 }
 
+                var layerGroups = [];
+
+                for (let grp of this._allLayersGroups) {
+                    const grpModel = {
+                        raw: grp,
+                        group: grp.group,
+                        layers: grp.layers,
+                        collapsed: ko.observable(grp.collapse)
+                    };
+
+                    layerGroups.push(grpModel);
+                }
+
+                const dialogModel = {
+                    self: this,
+                    layerGroups: layerGroups,
+                    customLayers: this._customLayers,
+                    onSelectWindowCancelClicked: function() {
+                        dialogModel.self.hideSelectWindow();
+                    },
+                    onSelectWindowResetClicked: function() {
+                        if (!dialogModel.self._configWindow) {
+                            return;
+                        }
+                        [
+                            ...dialogModel.self._allLayers,
+                            ...dialogModel.self._customLayers()
+                        ].forEach((layer) => layer.checked(layer.isDefault));
+                    },
+                    onSelectWindowOkClicked: function() {
+                        const newEnabledLayers = [];
+                        for (let layer of [...dialogModel.self._allLayers, ...dialogModel.self._customLayers()]) {
+                            if (layer.checked()) {
+                                if (!layer.enabled) {
+                                    newEnabledLayers.push(layer);
+                                }
+                                layer.enabled = true;
+                            } else {
+                                layer.enabled = false;
+                            }
+                        }
+                        dialogModel.self.updateEnabledLayers(newEnabledLayers);
+                        dialogModel.self.hideSelectWindow();
+                    },
+                    toggleLayer: function(grp) {
+                        return grp.collapsed(!grp.collapsed());
+                    },
+                    toggledHtml: function(grp) {
+                        return grp.collapsed() ? "[+]" : "[-]";
+                    }
+                };
+
                 const container = this._configWindow =
                     L.DomUtil.create('div', 'leaflet-layers-dialog-wrapper');
                 L.DomEvent
@@ -91,10 +143,15 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 container.innerHTML = `
 <div class="leaflet-layers-select-window">
     <form>
-        <!-- ko foreach: _allLayersGroups -->
-            <div class="section-header" data-bind="html: group"></div>
-            <!-- ko foreach: layers -->
+        <!-- ko foreach: { data:layerGroups, as: 'grp' } -->
+            <div class="section-header section-header-toggle" data-bind="click: $parent.toggleLayer">
                 <label>
+                    <span style="font-family: monospace;" data-bind="text: $parent.toggledHtml(grp)"></span>
+                    <span data-bind="html: grp.group"></span>
+                </label>
+            </div>
+            <!-- ko foreach: layers -->
+                <label style="margin-left: 16px;" data-bind="if: !grp.collapsed()">
                     <input type="checkbox" data-bind="checked: checked"/>
                     <span data-bind="text: title">
                     </span><!--  ko if: description -->
@@ -103,8 +160,8 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 </label>
             <!-- /ko -->
         <!-- /ko -->
-        <div data-bind="if: _customLayers().length" class="section-header">Custom layers</div>
-        <!-- ko foreach: _customLayers -->
+        <div data-bind="if: customLayers().length" class="section-header">Custom layers</div>
+        <!-- ko foreach: customLayers -->
                 <label>
                     <input type="checkbox" data-bind="checked: checked"/>
                     <span data-bind="text: title"></span>
@@ -118,7 +175,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
     </div>            
 </div>
                 `;
-                ko.applyBindings(this, container);
+                ko.applyBindings(dialogModel, container);
             },
 
             showLayersSelectWindow: function() {
@@ -137,33 +194,6 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 }
                 this._map._controlContainer.removeChild(this._configWindow);
                 this._configWindowVisible = false;
-            },
-
-            onSelectWindowCancelClicked: function() {
-                this.hideSelectWindow();
-            },
-
-            onSelectWindowResetClicked: function() {
-                if (!this._configWindow) {
-                    return;
-                }
-                [...this._allLayers, ...this._customLayers()].forEach((layer) => layer.checked(layer.isDefault));
-            },
-
-            onSelectWindowOkClicked: function() {
-                const newEnabledLayers = [];
-                for (let layer of [...this._allLayers, ...this._customLayers()]) {
-                    if (layer.checked()) {
-                        if (!layer.enabled) {
-                            newEnabledLayers.push(layer);
-                        }
-                        layer.enabled = true;
-                    } else {
-                        layer.enabled = false;
-                    }
-                }
-                this.updateEnabledLayers(newEnabledLayers);
-                this.hideSelectWindow();
             },
 
             onCustomLayerCreateClicked: function() {

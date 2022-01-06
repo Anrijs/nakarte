@@ -172,7 +172,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
         <div href="#" class="button" data-bind="click: onSelectWindowOkClicked">Ok</div>
         <div href="#" class="button" data-bind="click: onSelectWindowCancelClicked">Cancel</div>
         <div href="#" class="button" data-bind="click: onSelectWindowResetClicked">Reset</div>
-    </div>            
+    </div>
 </div>
                 `;
                 ko.applyBindings(dialogModel, container);
@@ -281,6 +281,44 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 return originalUnserializeState.call(this, values);
             },
 
+            showLayerOpacityForm: function(buttons, options) {
+                if (this._layerOpacityWindow || this._configWindowVisible) {
+                    return;
+                }
+                this._layerOpacityWindow =
+                    L.DomUtil.create('div', 'leaflet-layers-dialog-wrapper', this._map._controlContainer);
+
+                L.DomEvent
+                    .disableClickPropagation(this._layerOpacityWindow)
+                    .disableScrollPropagation(this._layerOpacityWindow);
+
+                let customLayerWindow = L.DomUtil.create('div', 'custom-layers-window', this._layerOpacityWindow);
+                let form = L.DomUtil.create('form', '', customLayerWindow);
+                L.DomEvent.on(form, 'submit', L.DomEvent.preventDefault);
+
+                const dialogModel = {
+                    opacity: ko.observable(Math.round(options.opacity * 100)),
+                    buttons: buttons,
+                    buttonClicked: function buttonClicked(callbackN) {
+                        const retValues = {
+                            opacity: dialogModel.opacity() / 100
+                        };
+                        buttons[callbackN].callback(retValues);
+                    }
+                };
+
+/* eslint-disable max-len */
+                const formHtml = `<b><u>Change layer opacity</u></b><br><br>
+<label>New opacity: &nbsp;<input type="number" data-bind="value: opacity" min="0" max="100" step="1"></input>%</label><br/>
+<br>
+<div data-bind="foreach: buttons">
+    <a class="button" data-bind="click: $root.buttonClicked.bind(null, $index()), text: caption"></a>
+</div>`;
+/* eslint-enable max-len */
+                form.innerHTML = formHtml;
+                ko.applyBindings(dialogModel, form);
+            },
+
             showCustomLayerForm: function(buttons, fieldValues) {
                 if (this._customLayerWindow || this._configWindowVisible) {
                     return;
@@ -354,6 +392,24 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     editButton.title = 'Edit layer';
                     L.DomEvent.on(editButton, 'click', (e) =>
                         this.onCustomLayerEditClicked(obj.layer.__customLayer, e)
+                    );
+                }
+                if (obj.layer.options.isOverlay) {
+                    const settingsButton = L.DomUtil.create('div', 'custom-layer-edit-button', label.children[0]);
+                    settingsButton.title = 'Opacity';
+
+                    const settingsIcon = L.DomUtil.create(
+                        'div',
+                        'custom-layer-edit-button icon-opacity',
+                        settingsButton
+                    );
+                    settingsIcon.title = 'Opacity';
+
+                    const opacityValue = L.DomUtil.create('span', 'layer-opacity-value', settingsButton);
+                    opacityValue.innerText = (obj.layer.options.opacity * 100) + "%";
+
+                    L.DomEvent.on(settingsButton, 'click', (e) =>
+                        this.onOpacityEditClicked(obj.layer, opacityValue, e)
                     );
                 }
                 if (obj.layer._justAdded) {
@@ -462,12 +518,23 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 this.hideCustomLayerForm();
             },
 
+            onLayerOpacityCancelClicked: function() {
+                this.hideLayerOpacityForm();
+            },
+
             hideCustomLayerForm: function() {
                 if (!this._customLayerWindow) {
                     return;
                 }
                 this._customLayerWindow.parentNode.removeChild(this._customLayerWindow);
                 this._customLayerWindow = null;
+            },
+            hideLayerOpacityForm: function() {
+                if (!this._layerOpacityWindow) {
+                    return;
+                }
+                this._layerOpacityWindow.parentNode.removeChild(this._layerOpacityWindow);
+                this._layerOpacityWindow = null;
             },
 
             onCustomLayerEditClicked: function(layer, e) {
@@ -480,6 +547,23 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     {caption: 'Delete', callback: () => this.onCustomLayerDeletelClicked(layer)},
                         {caption: 'Cancel', callback: () => this.onCustomLayerCancelClicked()}
                     ], layer.fieldValues
+                );
+            },
+
+            onOpacityEditClicked: function(layer, opacityValue, e) {
+                L.DomEvent.stop(e);
+                this.showLayerOpacityForm([
+                    {
+                        caption: 'Save',
+                        callback: (fieldValues) => {
+                            layer.setOpacity(fieldValues.opacity);
+                            opacityValue.innerText = Math.round(fieldValues.opacity * 100) + "%";
+                            this.updateEnabledLayers();
+                            this.hideLayerOpacityForm();
+                        }
+                    },
+                    {caption: 'Cancel', callback: () => this.onLayerOpacityCancelClicked()}
+                    ], layer.options
                 );
             },
 

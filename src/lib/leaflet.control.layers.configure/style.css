@@ -23,6 +23,15 @@
     background-image: url("pencil.svg");
 }
 
+.icon-opacity {
+    background-image: url("opacity.svg");
+}
+
+.layer-opacity-value {
+    font-size: 0.75em;
+    color: #666;
+}
+
 .leaflet-control-layers .button-config:hover {
     background-color: #f4f4f4;
 }

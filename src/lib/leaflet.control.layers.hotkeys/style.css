@@ -3,3 +3,9 @@
     color: #aaa;
     margin-left: 0.5em;
 }
+
+.layers-control-key {
+    border: solid 1px #aaa;
+    border-radius: 4px;
+    padding: 1px 3px;
+}

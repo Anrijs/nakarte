@@ -16,11 +16,41 @@ function getLayerHotkey(layer) {
     return null;
 }
 
+function getLayerModkeys(layer) {
+    if (!layer || !layer.options || !layer.options.modkey) {
+        return {
+            shift: false,
+            alt: false,
+            ctrl: false
+        };
+    }
+
+    return {
+        shift: layer.options.modkey.shift === true,
+        alt: layer.options.modkey.alt === true,
+        ctrl: layer.options.modkey.ctrl === true
+    };
+}
+
 function extendLayerName(name, layer) {
     if (layer.options) {
         const hotkey = getLayerHotkey(layer);
         if (hotkey) {
-            name += `<span class="layers-control-hotkey">${hotkey}</span>`;
+            const modKeys = getLayerModkeys(layer);
+            let extras = "";
+            if (modKeys.shift) {
+                extras += '<span class="layers-control-key">Shift</span> + ';
+            }
+            if (modKeys.ctrl) {
+                extras += '<span class="layers-control-key">Ctrlt</span> + ';
+            }
+            if (modKeys.alt) {
+                extras += '<span class="layers-control-key">Alt</span> + ';
+            }
+            name += `<span class="layers-control-hotkey">`;
+            name += extras;
+            name += `<span class="layers-control-key">${hotkey}</span>`;
+            name += `</span>`;
         }
     }
     return name;
@@ -64,7 +94,7 @@ function enableHotKeys(control) {
             },
 
             onKeyDown: function(e) {
-                if (e.altKey || e.ctrlKey || e.shiftKey) {
+                if (e.altKey || e.ctrlKey) {
                     return;
                 }
                 this._keyDown = e.keyCode;
@@ -82,10 +112,17 @@ function enableHotKeys(control) {
                     return;
                 }
                 const key = String.fromCharCode(e.keyCode);
+
                 for (let layer of this._layers) {
                     let layerId = L.stamp(layer.layer);
                     const layerHotkey = getLayerHotkey(layer.layer);
-                    if (layerHotkey === key) {
+                    const modKeys = getLayerModkeys(layer.layer);
+
+                    if (layerHotkey === key &&
+                        modKeys.shift === e.shiftKey &&
+                        modKeys.ctrl === e.ctrlKey &&
+                        modKeys.alt === e.altKey
+                    ) {
                         const inputs = this._form.getElementsByTagName('input');
                         for (let input of [...inputs]) {
                             if (input.layerId === layerId) {

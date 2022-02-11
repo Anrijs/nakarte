@@ -394,7 +394,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
                         this.onCustomLayerEditClicked(obj.layer.__customLayer, e)
                     );
                 }
-                if (obj.layer.options.isOverlay) {
+                if (obj.layer.options.isOverlay && !obj.layer.options.noOpacity) {
                     const settingsButton = L.DomUtil.create('div', 'custom-layer-edit-button', label.children[0]);
                     settingsButton.title = 'Opacity';
 

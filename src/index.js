@@ -36,7 +36,7 @@ preconnect(config.elevationsServer);
 preconnect(config.CORSProxyUrl);
 preconnect(config.tracksStorageServer);
 
-if (NODE_ENV === 'production') {
+if (config.useSentry && NODE_ENV === 'production') {
     Sentry.init({
         dsn: config.sentryDSN,
         release: RELEASE_VER

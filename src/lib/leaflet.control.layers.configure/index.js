@@ -6,6 +6,7 @@ import {notify} from '~/lib/notifications';
 import * as logging from '~/lib/logging';
 import safeLocalStorage from '~/lib/safe-localstorage';
 import './customLayer';
+import config from '~/config';
 
 function enableConfig(control, {layers, customLayersOrder}) {
     const originalOnAdd = control.onAdd;
@@ -357,6 +358,10 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     }
                 };
 
+                let zooms = '9';
+                for (let z = 10; z <= config.maxZoom; z++) {
+                    zooms += `,${z}`;
+                }
 /* eslint-disable max-len */
                 const formHtml = `
 <p><a class="doc-link" href="https://leafletjs.com/reference-1.0.3.html#tilelayer" target="_blank">See Leaflet TileLayer documentation for url format</a></p>
@@ -376,7 +381,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
 <label><input type="checkbox" data-bind="checked: tms" />TMS rows order</label><br />
 
 <label>Max zoom<br>
-<select data-bind="options: [9,10,11,12,13,14,15,16,17,18], value: maxZoom"></select></label>
+<select data-bind="options: [${zooms}], value: maxZoom"></select></label>
 <div data-bind="foreach: buttons">
     <a class="button" data-bind="click: $root.buttonClicked.bind(null, $index()), text: caption"></a>
 </div>`;
@@ -489,6 +494,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
                         isOverlay: fieldValues.isOverlay,
                         tms: fieldValues.tms,
                         maxNativeZoom: fieldValues.maxZoom,
+                        maxZoom: config.maxZoom,
                         scaleDependent: fieldValues.scaleDependent,
                         print: true,
                         jnx: true,

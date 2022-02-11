@@ -56,7 +56,7 @@ function setUp() {
             attributionControl: false,
             inertiaMaxSpeed: 1500,
             worldCopyJump: true,
-            maxZoom: 18
+            maxZoom: config.maxZoom
         }
     );
 

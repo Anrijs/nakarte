@@ -8,6 +8,8 @@ const config = {
         <a href="https://about.nakarte.me/p/blog-page_29.html">Donate</a>`,
     defaultLocation: [55.75185, 37.61856],
     defaultZoom: 10,
+    maxZoom: 18,
+    useSentry: false,
     googleApiUrl: `https://maps.googleapis.com/maps/api/js?v=3&key=${secrets.google}`,
     westraDataBaseUrl: 'https://nakarte.me/westraPasses/',
     CORSProxyUrl: 'https://proxy.nakarte.me/',

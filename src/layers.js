@@ -26,7 +26,7 @@ class LayerGroupWithOptions extends L.LayerGroup {
                     title: 'OpenStreetMap',
                     description: 'OSM default style',
                     isDefault: true,
-                    layer: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    layer: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         {
                             code: 'O',
                             isOverlay: false,
@@ -433,7 +433,8 @@ class LayerGroupWithOptions extends L.LayerGroup {
                         isOverlay: true,
                         print: false,
                         jnx: false,
-                        attribution: '<a href="https://wikimapia.org/">Wikimapia</a>'
+                        attribution: '<a href="https://wikimapia.org/">Wikimapia</a>',
+                        tilesBaseUrl: config.wikimapiaTilesBaseUrl,
                     })
                 },
                 {
@@ -462,7 +463,7 @@ class LayerGroupWithOptions extends L.LayerGroup {
                         {
                             code: 'Otm',
                             isOverlay: false,
-                            maxNativeZoom: 17,
+                            maxNativeZoom: 16,
                             scaleDependent: true,
                             print: true,
                             jnx: true,

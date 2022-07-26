@@ -4,6 +4,7 @@ import {fetch} from '~/lib/xhr-promise';
 import './style.css';
 import '../common/style.css';
 import config from '~/config';
+import {CloseButtonMixin, Events} from "../common";
 
 function getCoverageLayer(options) {
     const url = config.wikimediaCommonsCoverageUrl;
@@ -23,7 +24,8 @@ function parseSearchResponse(resp) { // eslint-disable-line complexity
     if (resp && resp.query && resp.query.pages && resp.query.pages) {
         for (let page of Object.values(resp.query.pages)) {
             const coordinates = page.coordinates?.[0];
-            const [baseName, extension] = (page.title ?? '').split('.', 2);
+            const pageTitle = page.title ?? '';
+            const extension = pageTitle.split('.').pop();
             if (
                 !coordinates ||
                 coordinates.globe !== 'earth' ||
@@ -31,8 +33,8 @@ function parseSearchResponse(resp) { // eslint-disable-line complexity
                 coordinates.lat === 0 ||
                 coordinates.lon === 0 ||
                 coordinates.lat === coordinates.lon ||
-                (baseName ?? '').includes('View of Earth') ||
-                (extension ?? '').toLowerCase() !== 'jpg'
+                pageTitle.includes('View of Earth') ||
+                extension.toLowerCase() !== 'jpg'
             ) {
                 continue;
             }
@@ -164,8 +166,10 @@ function formatDateTime(dateStr) {
 }
 
 const Viewer = L.Evented.extend({
+    includes: [CloseButtonMixin],
     initialize: function(container) {
         container = L.DomUtil.create('div', 'wikimedia-viewer-container', container);
+        this.createCloseButton(container);
         const mapContainer = this.mapContainer = L.DomUtil.create('div', 'wikimedia-viewer-map-container', container);
         this.pageButtonContainer = L.DomUtil.create('div', 'wikimedia-viewer-page-buttons-container', container);
 
@@ -177,11 +181,9 @@ const Viewer = L.Evented.extend({
             zoomSnap: 0,
         });
 
-        this.map.on('zoomend', this.notifyChange, this);
-        this.map.on('moveend', this.notifyChange, this);
+        this.map.on('zoomend moovend', () => this.fire(Events.YawPitchZoomChangeEnd));
 
         this.infoLabel = L.DomUtil.create('div', 'wikimedia-viewer-info-overlay', mapContainer);
-        this.closeButton = L.DomUtil.create('div', 'photo-viewer-button-close', container);
         this.prevPhotoButton = L.DomUtil.create('div', 'wikimedia-viewer-button-prev', mapContainer);
         this.nextPhotoButton = L.DomUtil.create('div', 'wikimedia-viewer-button-next', mapContainer);
         L.DomEvent.on(this.prevPhotoButton, 'click', () => {
@@ -190,7 +192,6 @@ const Viewer = L.Evented.extend({
         L.DomEvent.on(this.nextPhotoButton, 'click', () => {
             this.switchPhoto(this._imageIdx + 1);
         });
-        L.DomEvent.on(this.closeButton, 'click', this.onCloseClick, this);
     },
 
     setupPageButtons: function(count) {
@@ -272,13 +273,13 @@ const Viewer = L.Evented.extend({
         for (let [i, button] of this._buttons.entries()) {
             ((i === imageIdx) ? L.DomUtil.addClass : L.DomUtil.removeClass)(button, 'active');
         }
-        this.notifyChange();
+        this.notifyImageChange();
     },
 
-    notifyChange: function() {
+    notifyImageChange: function() {
         if (this.images && this._active) {
             const image = this.images[this._imageIdx];
-            this.fire('change', {
+            this.fire(Events.ImageChange, {
                     latlng: L.latLng(image.lat, image.lng),
                     latlngs: this.images.map((image) => L.latLng(image.lat, image.lng))
                 }
@@ -286,18 +287,10 @@ const Viewer = L.Evented.extend({
         }
     },
 
-    _showPano: function(images, imageIdx = 0, imagePos = null) {
+    showPano: function(images, imageIdx = 0, imagePos = null) {
         this.images = images;
         this.setupPageButtons(images.length);
         this.switchPhoto(imageIdx, imagePos);
-    },
-
-    showPano: function(images) {
-        this._showPano(images);
-    },
-
-    onCloseClick: function() {
-        this.fire('closeclick');
     },
 
     activate: function() {
@@ -328,7 +321,7 @@ const Viewer = L.Evented.extend({
                     }
                 }
                 if (imageIdx > -1) {
-                    this._showPano(resp.data, imageIdx, {center: L.latLng(y, x), zoom});
+                    this.showPano(resp.data, imageIdx, {center: L.latLng(y, x), zoom});
                 }
             });
             return true;

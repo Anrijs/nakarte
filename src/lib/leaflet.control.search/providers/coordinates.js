@@ -434,6 +434,9 @@ class CoordinatesProvider {
                         category: 'Coordinates',
                         address: null,
                         icon: null,
+                        subtitle: null,
+                        extra: null,
+                        iconcss: null,
                     };
                 });
                 return {

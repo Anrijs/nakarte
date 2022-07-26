@@ -73,8 +73,35 @@
     background-color: white;
     border: 1px solid #aaa;
     border-top: none;
+}
+
+.leaflet-search-results .leaflet-search-result-primary {
     padding: 8px 6px;
     cursor: pointer;
+}
+
+.leaflet-search-results .leaflet-search-result-secondary {
+    background-color: white;
+    padding: 2px 6px;
+    cursor: pointer;
+    border-top: solid 1px #f4f4f4;
+}
+
+.leaflet-search-results .leaflet-search-result-secondary:hover {
+    background-color: #eceff1;
+    border-top: solid 1px #e8e8e8;
+}
+
+.leaflet-search-results-extras {
+    padding-left: 12px;
+    list-style: square;
+}
+
+.leaflet-search-results-extras li {
+    padding: 0;
+    background: none;
+    border: none;
+    color: #555;
 }
 
 .leaflet-search-results li:last-child {
@@ -98,6 +125,9 @@
     color: #999;
 }
 
+.leaflet-search-results .subtitle {
+    color: #555;
+}
 .leaflet-search-results .category {
     font-size: 14px;
     color: #999;
@@ -138,4 +168,132 @@
 
 .icon-search {
     background-image: url("search.svg");
+}
+
+.provider-settings-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: white;
+    background-position: 50% 50%;
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
+    margin-right: 4px;
+    background-image: url("settings.svg");
+    padding: 2px;
+    margin-top: 1px;
+    cursor: pointer;
+}
+
+.provider-label .provider-settings {
+    display: flex;
+    border-bottom: solid #e5e5e5 1px;
+    padding: 4px 0;
+}
+
+.provider-text {
+    font-size: 1.1em;
+    margin-left: 4px;
+}
+
+.provider-desc {
+    color: #777;
+    font-size: 0.8em;
+}
+
+.icons8 {
+    display: inline-block;
+    height: 16px;
+    width: 16px;
+    position: relative;
+    top: 6px;
+    background-position: 50% 50%;
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
+    margin-top: -4px;
+}
+
+.icons8-cave {
+    background-image: url('images/icons8-cave-48.png');
+}
+
+.icons8-cemetery {
+    background-image: url('images/icons8-cemetery-48.png');
+}
+
+.icons8-cliff {
+    background-image: url('images/icons8-cliff-48.png');
+}
+
+.icons8-creek {
+    background-image: url('images/icons8-creek-48.png');
+}
+
+.icons8-dam {
+    background-image: url('images/icons8-dam-48.png');
+}
+
+.icons8-downtown {
+    background-image: url('images/icons8-downtown-48.png');
+}
+
+.icons8-farm {
+    background-image: url('images/icons8-farm-48.png');
+}
+
+.icons8-field {
+    background-image: url('images/icons8-field-48.png');
+}
+
+.icons8-forest {
+    background-image: url('images/icons8-forest-48.png');
+}
+
+.icons8-hills {
+    background-image: url('images/icons8-hills-48.png');
+}
+
+.icons8-house-with-a-garden {
+    background-image: url('images/icons8-house-with-a-garden-48.png');
+}
+
+.icons8-island-on-water {
+    background-image: url('images/icons8-island-on-water-48.png');
+}
+
+.icons8-lake {
+    background-image: url('images/icons8-lake-48.png');
+}
+
+.icons8-spade {
+    background-image: url('images/icons8-spade-48.png');
+}
+
+.icons8-swamp {
+    background-image: url('images/icons8-swamp-48.png');
+}
+
+.icons8-top-of-a-hill {
+    background-image: url('images/icons8-top-of-a-hill-48.png');
+}
+
+.icons8-village {
+    background-image: url('images/icons8-village-48.png');
+}
+
+.icons8-tracks {
+    background-image: url('images/icons8-tracks-48.png');
+}
+
+.icons8-region {
+    background-image: url('images/icons8-region-48.png');
+}
+
+.icons8-chapel {
+    background-image: url('images/icons8-chapel-48.png');
+}
+
+.icons8-castle {
+    background-image: url('images/icons8-castle-48.png');
 }

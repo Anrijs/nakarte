@@ -29,6 +29,9 @@ function makeSearchResult(lat, lon, zoom, title) {
         category: null,
         address: null,
         icon: null,
+        subtitle: null,
+        extra: null,
+        iconcss: null,
     };
 }
 

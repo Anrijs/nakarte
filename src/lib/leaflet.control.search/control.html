@@ -33,15 +33,53 @@
                 },
             ">
         <div class="leaflet-search-clear-button" data-bind="visible: query, click: onClearClick"></div>
+        <div class="provider-settings-icon" data-bind="click: onSettingsClick"></div>
     </div>
     <ul class="leaflet-search-results" data-bind="visible: showResults">
         <!-- ko foreach: {data: items} -->
         <li data-bind="
             event: {mouseover: $root.onItemMouseOver},
-            click: $root.onItemClick,
             css: {highlighted: $index() === $root.highlightedIndex()}">
-            <p><span class="title" data-bind="text: title"></span>&nbsp;&nbsp;<img class="icon" data-bind="visible: icon, attr: {src: icon}"><span class="category" data-bind="text: category"></span></p>
-            <p class="address" data-bind="text: address"></p>
+            <div class="leaflet-search-result-primary" data-bind="click: $root.onItemClick">
+                <p>
+                    <!--  ko if: iconcss -->
+                    <span data-bind="attr: {class: iconcss}"> </span>
+                    <!-- /ko -->
+                    <span class="title" data-bind="text: title"></span>
+                    <!--  ko if: icon -->
+                    &nbsp;&nbsp;
+                    <img class="icon" data-bind="visible: icon, attr: {src: icon}">
+                    <!-- /ko -->
+                    <!--  ko if: category -->
+                    <span class="category" data-bind="text: category"></span>
+                    <!-- /ko -->
+                </p>
+                <p class="subtitle" data-bind="html: subtitle"></p>
+
+                <!--  ko if: address -->
+                <p class="address" data-bind="text: address"></p>
+                <!-- /ko -->
+
+                <!--  ko if: extra && extra.items.length -->
+                <ul class="leaflet-search-results-extras" data-bind="visible: extra.visible">
+                    <!-- ko foreach: {data: extra.items} -->
+                    <li>
+                        <span data-bind="text: key"></span>: <span data-bind="text: value"></span>
+                    </li>
+                    <!-- /ko -->
+                </ul>
+                <!-- /ko -->
+            </div>
+
+            <!--  ko if: extra && extra.items.length -->
+            <div class="leaflet-search-result-secondary" data-bind="click: onShowDetailsClick">
+                <u>
+                    <span data-bind="text: extra.visible() ? 'Rādīt mazāk informācijas' : 'Rādīt vairāk informācijas'">
+                        Vairāk informācijas
+                    </span>
+                </u>
+            </div>
+            <!-- /ko -->
         </li>
         <!-- /ko -->
         <!-- ko if: attribution -->
@@ -49,7 +87,7 @@
             Search powered by <a data-bind="
                 text: attribution().text,
                 attr: {href: attribution().url},
-                event: {contextmenu: defaultEventHandle}"></a>
+                event: {contextmenu: defaultEventHandle}"></a>&nbsp;
         </li>
         <!-- /ko -->
     </ul>

@@ -108,6 +108,10 @@ class SearchViewModel {
         this.inputHasFocus(true);
     }
 
+    onSettingsClick() {
+        this.settingsOpened(null);
+    }
+
     defaultEventHandle(_, e) {
         L.DomEvent.stopPropagation(e);
         return true;
@@ -173,6 +177,7 @@ class SearchViewModel {
     searchRequested = ko.observable().extend({notify: 'always'});
     searchAborted = ko.observable().extend({notify: 'always'});
     escapePressed = ko.observable().extend({notify: 'always'});
+    settingsOpened = ko.observable().extend({notify: 'always'});
 
     // public methods
     setResult(items, attribution) {
@@ -215,7 +220,6 @@ const SearchControl = L.Control.extend({
     includes: L.Mixin.Events,
 
     options: {
-        provider: 'mapycz',
         providerOptions: {
             maxResponses: 5,
         },
@@ -223,23 +227,51 @@ const SearchControl = L.Control.extend({
         hotkey: 'L',
         maxMapHeightToMinimize: 567,
         maxMapWidthToMinimize: 450,
-        tooltip: 'Search places, coordinates, links (Alt-{hotkey})',
-        help: 'Coordinates in any format. Links to maps: Yandex, Google, OSM, Mapy.cz, Nakarte',
+        tooltip: 'Search places, coordinates, links',
+        help: '',
+    },
+
+    updateTooltip: function () {
+        const tooltip = this.provider.options.tooltip ?? this.options.tooltip;
+        this.viewModel.setInputPlaceholder(L.Util.template(tooltip + ' (Alt-{hotkey})', this.options));
     },
 
     initialize: function (options) {
+        // init providers
+        this.providers = [];
+        for (const [key, Klass] of Object.entries(providers)) {
+            this.providers.push({
+                key: key,
+                provider: new Klass(this.options.providerOptions),
+            });
+        }
+
         L.Control.prototype.initialize.call(this, options);
-        this.provider = new providers[this.options.provider](this.options.providerOptions);
+        this.provider = this.providers[0].provider;
         this.magicProviders = magicProviders.map((Cls) => new Cls());
         this.searchPromise = null;
         this.viewModel = new SearchViewModel(this.options.minQueryLength);
-        this.viewModel.setInputPlaceholder(L.Util.template(this.options.tooltip, this.options));
         this.viewModel.setHelpText(this.options.help);
         this.viewModel.searchRequested.subscribe(this.onSearchRequested.bind(this));
         this.viewModel.searchAborted.subscribe(this.onSearchAborted.bind(this));
         this.viewModel.itemSelected.subscribe(this.onResultItemClicked.bind(this));
         this.viewModel.query.subscribe(() => this.fire('querychange'));
         this.viewModel.escapePressed.subscribe(this.setFocusToMap.bind(this));
+        this.viewModel.settingsOpened.subscribe(this.onSettingsOpened.bind(this));
+        this.updateTooltip();
+        this.providerkey = this.providers[0].key;
+    },
+
+    selectProvider: function (key) {
+        for (let i = 0; this.providers.length; i++) {
+            const p = this.providers[i];
+            if (p.key === key) {
+                this.providerkey = key;
+                this.provider = p.provider;
+                this.updateTooltip();
+                break;
+            }
+        }
     },
 
     onAdd: function (map) {
@@ -265,6 +297,103 @@ const SearchControl = L.Control.extend({
 
     setFocusToMap: function () {
         this._map.getContainer().focus();
+    },
+
+    hideSelectWindow: function () {
+        if (!this._configWindowVisible) {
+            return;
+        }
+        this._map._controlContainer.removeChild(this._configWindow);
+        this._configWindowVisible = false;
+    },
+
+    showProviderSettingsWindow: function (buttons, providerList) {
+        if (this._providerSelectionWindow || this._configWindowVisible) {
+            return;
+        }
+
+        this._providerSelectionWindow = L.DomUtil.create(
+            'div',
+            'leaflet-layers-dialog-wrapper',
+            this._map._controlContainer
+        );
+
+        L.DomEvent.disableClickPropagation(this._providerSelectionWindow);
+        L.DomEvent.disableScrollPropagation(this._providerSelectionWindow);
+
+        const customLayerWindow = L.DomUtil.create('div', 'custom-layers-window', this._providerSelectionWindow);
+        const form = L.DomUtil.create('form', '', customLayerWindow);
+        L.DomEvent.on(form, 'submit', L.DomEvent.preventDefault);
+
+        const dialogModel = {
+            selected: ko.observable(),
+            buttons: buttons,
+            providers: providerList,
+            buttonClicked: function buttonClicked(callbackN) {
+                const retValues = {
+                    selected: dialogModel.selected,
+                };
+                buttons[callbackN].callback(retValues);
+            },
+        };
+
+        dialogModel.selected(this.providerkey);
+
+        /* eslint-disable max-len */
+        const formHtml = `
+        <b>Search provider:</b>
+        <!-- ko foreach: providers -->
+        <div>
+            <label class="provider-label provider-settings">
+                <input type="radio" name="provider" data-bind="checked: $root.selected, checkedValue: key"/>
+                <span class="provider-text">
+                    <span data-bind="text: provider.name"></span>
+                    <!--  ko if: provider.description -->
+                    <br>
+                    <span class="provider-desc" data-bind="html: provider.description || ''"></span>
+                    <!-- /ko -->
+                </span>
+            </label>
+        </div>
+        <!-- /ko -->
+        <br>
+        <div data-bind="foreach: buttons">
+        <a class="button" data-bind="click: $root.buttonClicked.bind(null, $index()), text: caption"></a>
+        </div>`;
+        /* eslint-enable max-len */
+        form.innerHTML = formHtml;
+        ko.applyBindings(dialogModel, form);
+    },
+
+    hideProviderSettingsWindow: function () {
+        if (!this._providerSelectionWindow) {
+            return;
+        }
+        this._providerSelectionWindow.parentNode.removeChild(this._providerSelectionWindow);
+        this._providerSelectionWindow = null;
+    },
+
+    onProviderSettingsWindowCancelClicked: function () {
+        this.hideProviderSettingsWindow();
+    },
+
+    onSettingsOpened: function () {
+        this.showProviderSettingsWindow(
+            [
+                {
+                    caption: 'Save',
+                    callback: (fieldValues) => {
+                        this.selectProvider(fieldValues.selected());
+                        this.hideProviderSettingsWindow();
+                    },
+                },
+                {
+                    caption: 'Cancel',
+                    callback: () => this.onProviderSettingsWindowCancelClicked(),
+                },
+            ],
+            this.providers
+        );
     },
 
     onSearchRequested: async function () {

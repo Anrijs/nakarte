@@ -65,9 +65,12 @@ const MapyCzProvider = BaseProvider.extend({
                 const place = {
                     latlng: L.latLng(data.latitude, data.longitude),
                     title: data.suggestFirstRow,
+                    subtitle: null,
+                    extra: null,
                     address: data.suggestSecondRow,
                     category: categories[data.poiTypeId]?.[this.categoriesLanguage] || data.suggestThirdRow || null,
                     icon,
+                    iconcss: null,
                 };
                 if (data.bbox) {
                     place.bbox = L.latLngBounds([data.bbox[0], data.bbox[1]], [data.bbox[2], data.bbox[3]]);

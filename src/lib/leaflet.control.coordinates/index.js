@@ -11,7 +11,8 @@ import * as formats from './formats';
 const DEFAULT_FORMAT = formats.DEGREES;
 const UNKNOWN_COORDINATES = {
     lat: '-------',
-    lng: '-------'
+    lng: '-------',
+    extra: '',
 };
 
 L.Control.Coordinates = L.Control.extend({
@@ -23,7 +24,8 @@ L.Control.Coordinates = L.Control.extend({
             formats.SIGNED_DEGREES,
             formats.DEGREES,
             formats.DEGREES_AND_MINUTES,
-            formats.DEGREES_AND_MINUTES_AND_SECONDS
+            formats.DEGREES_AND_MINUTES_AND_SECONDS,
+            formats.LKS92
         ],
 
         initialize: function(options) {
@@ -69,6 +71,7 @@ L.Control.Coordinates = L.Control.extend({
             barContainer.innerHTML = `
                 <div data-bind="css: wrapperClass">
                     <div class="leaflet-coordinates-container" data-bind="with: formattedCoordinates()">
+                        <span class="leaflet-coordinates-latitude" data-bind="html: extra"></span>
                         <span class="leaflet-coordinates-latitude" data-bind="html: lat"></span>
                         <span class="leaflet-coordinates-longitude" data-bind="html: lng"></span>
                     </div>
@@ -134,8 +137,8 @@ L.Control.Coordinates = L.Control.extend({
             L.DomEvent.stop(e);
 
             function createItem(format, options = {}) {
-                const {lat, lng} = formats.formatLatLng(e.latlng.wrap(), format);
-                const coordinates = `${lat} ${lng}`;
+                const {lat, lng, extra} = formats.formatLatLng(e.latlng.wrap(), format);
+                const coordinates = extra || `${lat} ${lng}`;
 
                 return {text: `${coordinates} <span class="leaflet-coordinates-menu-fmt">${format.label}</span>`,
                     callback: () => copyToClipboard(coordinates, e.originalEvent),

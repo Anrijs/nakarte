@@ -7,6 +7,7 @@ import * as logging from '~/lib/logging';
 import safeLocalStorage from '~/lib/safe-localstorage';
 import './customLayer';
 import config from '~/config';
+import {LeafletCompare} from '~/lib/leaflet.control.compare';
 
 function enableConfig(control, {layers, customLayersOrder}) {
     const originalOnAdd = control.onAdd;
@@ -39,6 +40,25 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 newCustomLayerButton.title = 'Add custom layer';
                 this._topRow.appendChild(newCustomLayerButton);
                 L.DomEvent.on(newCustomLayerButton, 'click', this.onCustomLayerCreateClicked, this);
+
+                const compareButton = L.DomUtil.create('div', 'button button-text');
+                compareButton.title = 'Add custom layer';
+                compareButton.innerText = "Compare";
+                this._topRow.appendChild(compareButton);
+                L.DomEvent.on(compareButton, 'click', this.onCompareButtonClicked, this);
+
+                const compareSliderButton = L.DomUtil.create('div', 'button button-alt icon-split');
+                compareSliderButton.title = 'Split View';
+                L.DomEvent.on(compareSliderButton, 'click', this.onCompareModeClicked, this);
+
+                const compareMagnifyButton = L.DomUtil.create('div', 'button button-alt icon-layer-search');
+                compareMagnifyButton.title = 'Explore View';
+                L.DomEvent.on(compareMagnifyButton, 'click', this.onCompareModeClicked, this);
+
+                this.__compareButtons = [
+                    [0, compareSliderButton],
+                    [1, compareMagnifyButton]
+                ];
             },
 
             _initializeLayersState: function() {
@@ -71,6 +91,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     layer.enabled = enabled;
                     layer.checked = ko.observable(enabled);
                     layer.description = layer.description || '';
+                    layer.__compareSide = 'L';
                 }
                 this.updateEnabledLayers();
             },
@@ -221,6 +242,70 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 );
             },
 
+            compareLayers: function() {
+                let leftList = [];
+                let rightList = [];
+
+                const enabledLayers = [...this._allLayers, ...this._customLayers()].filter((l) => l.enabled);
+                enabledLayers.sort((l1, l2) => l1.order - l2.order);
+                enabledLayers.forEach((l) => {
+                        const {layer: {options: {isOverlay}}} = l;
+                        if (isOverlay && l.layer.getContainer) {
+                            if (this._map.hasLayer(l.layer)) {
+                                if (l.layer.__compareSide === 'R') {
+                                    rightList.push(l.layer);
+                                } else if (l.layer.__compareSide === 'L') {
+                                    leftList.push(l.layer);
+                                }
+                            }
+                        }
+                    }
+                );
+
+                if (this.compare) {
+                    this.compare.updateLayers(leftList, rightList);
+                } else {
+                    this.compare = new LeafletCompare(leftList, rightList, {
+                        thumbSize: 36,
+                        padding: 0,
+                        width: 2,
+                    });
+                    this.compare.addTo(this._map);
+                }
+            },
+
+            onCompareButtonClicked: function(e) {
+                if (this.compareEnabled) {
+                    e.target.classList.remove("button-active");
+                    this.__compareButtons.forEach((b) => this._topRow.removeChild(b[1]));
+                    this.compareEnabled = false;
+                    this.compare.remove();
+                    this.compare = null;
+                } else {
+                    e.target.classList.add("button-active");
+                    this.__compareButtons.forEach((b) => this._topRow.appendChild(b[1]));
+                    this.__compareButtons[0][1].click();
+                    this.compareEnabled = true;
+                    this.compareLayers();
+                }
+                this.updateEnabledLayers();
+            },
+
+            onCompareModeClicked: function(e) {
+                let id = 0;
+                this.__compareButtons.forEach((b) => {
+                    b[1].classList.remove("button-active-alt");
+                    if (b[1] === e.target) {
+                        id = b[0];
+                    }
+                });
+                e.target.classList.add("button-active-alt");
+                if (this.compare) {
+                    this.compare.setMode(id);
+                }
+                this.updateEnabledLayers();
+            },
+
             updateEnabledLayers: function(addedLayers) {
                 const disabledLayers = [...this._allLayers, ...this._customLayers()].filter((l) => !l.enabled);
                 disabledLayers.forEach((l) => this._map.removeLayer(l.layer));
@@ -232,6 +317,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 enabledLayers.forEach((l) => {
                         l.layer._justAdded = addedLayers && addedLayers.includes(l);
                         const {layer: {options: {isOverlay}}} = l;
+
                         if (isOverlay) {
                             this.addOverlay(l.layer, l.title);
                         } else {
@@ -239,6 +325,10 @@ function enableConfig(control, {layers, customLayersOrder}) {
                         }
                         if (!isOverlay && this._map.hasLayer(l.layer)) {
                               hasBaselayerOnMap = true;
+                        }
+
+                        if (!l.layer.__compareSide) {
+                            l.layer.__compareSide = 'L';
                         }
                     }
                 );
@@ -390,25 +480,78 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 ko.applyBindings(dialogModel, form);
             },
 
+            updateCompareButton: function(obj, editButton) {
+                editButton.classList.remove('icon-left');
+                editButton.classList.remove('icon-right');
+                editButton.classList.remove('icon-left-right');
+                editButton.classList.remove('icon-layer-search');
+                editButton.classList.remove('icon-background');
+
+                if (this.compare && this.compare._mode === 1) {
+                    if (obj.layer.__compareSide === 'L') {
+                        editButton.classList.add('icon-layer-search');
+                    } else {
+                        editButton.classList.add('icon-background');
+                    }
+                } else {
+                    if (obj.layer.__compareSide === 'L') {
+                        editButton.classList.add('icon-left');
+                    } else if (obj.layer.__compareSide === 'R') {
+                        editButton.classList.add('icon-right');
+                    } else {
+                        editButton.classList.add('icon-left-right');
+                    }
+                }
+            },
+
+            onLayerSideClicked: function(obj, editButton, e) {
+                L.DomEvent.stop(e);
+
+                switch (obj.layer.__compareSide) {
+                    case 'L':
+                        if (this.compare && this.compare._mode === 1) {
+                            obj.layer.__compareSide = 'R';
+                        } else {
+                            obj.layer.__compareSide = '-';
+                        }
+                        break;
+                    case '-':
+                        obj.layer.__compareSide = 'R';
+                        break;
+                    default:
+                        obj.layer.__compareSide = 'L';
+                        break;
+                }
+
+                this.updateCompareButton(obj, editButton);
+                this.compareLayers();
+            },
+
             _addItem: function(obj) {
                 var label = originalAddItem.call(this, obj);
                 if (obj.layer.__customLayer) {
-                    const editButton = L.DomUtil.create('div', 'custom-layer-edit-button icon-edit', label.children[0]);
+                    const editButton = L.DomUtil.create('div', 'layer-extra-button icon-edit', label.children[0]);
                     editButton.title = 'Edit layer';
                     L.DomEvent.on(editButton, 'click', (e) =>
                         this.onCustomLayerEditClicked(obj.layer.__customLayer, e)
                     );
                 }
-                if (obj.layer.options.isOverlay && !obj.layer.options.noOpacity) {
-                    const settingsButton = L.DomUtil.create('div', 'custom-layer-edit-button', label.children[0]);
-                    settingsButton.title = 'Opacity';
+                if (obj.layer.options.isOverlay && this.compareEnabled) {
+                    const editButton = L.DomUtil.create('div', 'layer-extra-button', label.children[0]);
+                    editButton.title = 'Change side';
+                    this.updateCompareButton(obj, editButton);
 
-                    const settingsIcon = L.DomUtil.create(
-                        'div',
-                        'custom-layer-edit-button icon-opacity',
-                        settingsButton
+                    L.DomEvent.on(editButton, 'click', (e) =>
+                        this.onLayerSideClicked(obj, editButton, e)
                     );
-                    settingsIcon.title = 'Opacity';
+                }
+                if (obj.layer.options.isOverlay && !obj.layer.options.noOpacity) {
+                    const settingsButton = L.DomUtil.create(
+                        'div',
+                        'layer-extra-button layer-extra-button-text icon-opacity',
+                        label.children[0]
+                    );
+                    settingsButton.title = 'Opacity';
 
                     const opacityValue = L.DomUtil.create('span', 'layer-opacity-value', settingsButton);
                     opacityValue.innerText = (obj.layer.options.opacity * 100) + "%";

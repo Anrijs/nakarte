@@ -15,6 +15,36 @@
     margin-right: 4px;
 }
 
+.button-text {
+    width: auto !important;
+    padding: 0 4px;
+}
+
+.button-active {
+    background-color: #228dff !important;
+    border: solid 1px #228dff !important;
+    color: #fff;
+}
+
+.button-alt {
+    background-color: #eee !important;
+}
+
+.button-active-alt {
+    height: 16px !important;
+    width: 16px !important;
+    border: solid 2px #228dff !important;
+    background-color: #fff !important;
+}
+
+.button-active:hover {
+    background-color: #4aa1ff !important;
+}
+
+.button:hover {
+    background-color: #f0f0f0;
+}
+
 .icon-settings {
     background-image: url("settings.svg");
 }
@@ -25,6 +55,34 @@
 
 .icon-opacity {
     background-image: url("opacity.svg");
+}
+
+.icon-split {
+    background-image: url("flip-horizontal.svg");
+}
+
+.icon-magnify {
+    background-image: url("magnify.svg");
+}
+
+.icon-layer-search {
+    background-image: url("eye-circle-outline.svg");
+}
+
+.icon-left {
+    background-image: url("arrow-left.svg");
+}
+
+.icon-left-right {
+    background-image: url("arrow-left-right.svg");
+}
+
+.icon-right {
+    background-image: url("arrow-right.svg");
+}
+
+.icon-background {
+    background-image: url("flip-to-back.svg");
 }
 
 .layer-opacity-value {
@@ -169,6 +227,36 @@
     vertical-align: text-bottom;
     margin-left: 2px;
     cursor: pointer;
+}
+
+.layer-extra-button {
+    display: inline-block;
+    vertical-align: bottom;
+    margin-left: 2px;
+
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: white;
+
+    background-position: 50% 50%;
+    background-repeat: no-repeat;
+    background-size: 14px 14px;
+}
+
+.layer-extra-button-text {
+    width: auto;
+    padding-left: 14px;
+    padding-right: 2px;
+    background-position: left;
+    line-height: 14px;
+}
+
+.layer-extra-button:hover {
+    background-color: #d8d8d8;
 }
 
 .custom-layers-window .doc-link {

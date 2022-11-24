@@ -1,11 +1,13 @@
 .layers-control-hotkey {
+    height: 14px;
     font-size: 78%;
-    color: #aaa;
+    color: #ccc;
     margin-left: 0.5em;
 }
 
 .layers-control-key {
-    border: solid 1px #aaa;
+    height: 14px;
+    border: solid 1px #ccc;
     border-radius: 4px;
     padding: 1px 3px;
 }

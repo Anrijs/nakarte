@@ -30,6 +30,43 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 return container;
             },
 
+            _initializeHotkeys() {
+                L.DomEvent.on(document, 'keydown', this._onKeyDown, this);
+            },
+
+            _onKeyDown: function(e) {
+                if (typeof this._layerIndex === 'undefined') {
+                    this._layerIndex = -1;
+                }
+
+                const overlays = [...this._allLayers, ...this._customLayers()]
+                    .filter((l) => l.enabled && l.layer.options.isOverlay);
+                overlays.sort((l1, l2) => l1.order - l2.order);
+
+                if (e.keyCode === 188) { // [<] prev
+                    this._layerIndex -= 1;
+                    if (this._layerIndex < 0) {
+                        this._layerIndex = overlays.length - 1;
+                    }
+                } else if (e.keyCode === 190) { // [>] next
+                    this._layerIndex += 1;
+                    if (this._layerIndex >= overlays.length) {
+                        this._layerIndex = 0;
+                    }
+                } else {
+                    return;
+                }
+
+                overlays.forEach((layer, id) => {
+                    if (id === this._layerIndex) {
+                        this._map.addLayer(layer.layer);
+                    } else {
+                        this._map.removeLayer(layer.layer);
+                    }
+                    layer.checked(id === this._layerIndex);
+                });
+            },
+
             __injectConfigButton: function() {
                 const configButton = L.DomUtil.create('div', 'button icon-settings');
                 configButton.title = 'Configure layers';
@@ -792,6 +829,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
         control.__injectConfigButton();
     }
     control._initializeLayersState();
+    control._initializeHotkeys();
 }
 
 export default enableConfig;

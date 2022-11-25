@@ -185,21 +185,6 @@ const LeafletCompare = L.Control.extend({
         return this;
     },
 
-    _updateTouchClipSearch(e = null) {
-        if (!e) {
-            return this;
-        }
-
-        const touch = e.originalEvent.touches[0] || e.originalEvent.changedTouches[0];
-        const evt = {
-            containerPoint: {
-                x: touch.pageX,
-                y: touch.pageY,
-            }
-        }
-        return _updateClipSearch();
-    },
-
     _updateClipSearch(e = null) {
         if (!this._map || this._mode !== 1 || !e || !e.containerPoint) {
             return this;
@@ -266,7 +251,6 @@ const LeafletCompare = L.Control.extend({
             return;
         }
         map.on('mousemove', this._updateClipSearch, this);
-        map.on('touchmove', this._updateTouchClipSearch, this);
         map.on('move', this._updateClip, this);
         map.on('layeradd layerremove', this._updateLayers, this);
         on(range, getRangeEvent(range), this._updateClip, this);
@@ -284,7 +268,6 @@ const LeafletCompare = L.Control.extend({
         }
         if (map) {
             map.off('mousemove', this._updateClipSearch, this);
-            map.off('touchmove', this._updateTouchClipSearch, this);
             map.off('layeradd layerremove', this._updateLayers, this);
             map.off('move', this._updateClip, this);
         }

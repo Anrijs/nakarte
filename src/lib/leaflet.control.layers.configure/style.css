@@ -151,6 +151,15 @@
     color: #333;
 }
 
+.button.button-sm {
+    height: 22px;
+    margin-right: 2px;
+    padding: 0 0.5em;
+    line-height: 20px;
+    font-size: 12px;
+}
+
+
 .leaflet-layers-select-window .button:hover {
     background-color: #f4f4f4;
 }

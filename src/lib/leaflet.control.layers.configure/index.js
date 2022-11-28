@@ -171,6 +171,24 @@ function enableConfig(control, {layers, customLayersOrder}) {
                             ...dialogModel.self._customLayers()
                         ].forEach((layer) => layer.checked(layer.isDefault));
                     },
+                    onSelectWindowSelNoneClicked: function() {
+                        if (!dialogModel.self._configWindow) {
+                            return;
+                        }
+                        [
+                            ...dialogModel.self._allLayers,
+                            ...dialogModel.self._customLayers()
+                        ].forEach((l) => l.checked(l.isDefault && !l.layer.options.isOverlay));
+                    },
+                    onSelectWindowSelAllClicked: function() {
+                        if (!dialogModel.self._configWindow) {
+                            return;
+                        }
+                        [
+                            ...dialogModel.self._allLayers,
+                            ...dialogModel.self._customLayers()
+                        ].forEach((l) => l.checked(true));
+                    },
                     onSelectWindowOkClicked: function() {
                         const newEnabledLayers = [];
                         for (let layer of [...dialogModel.self._allLayers, ...dialogModel.self._customLayers()]) {
@@ -230,7 +248,9 @@ function enableConfig(control, {layers, customLayersOrder}) {
     <div class="buttons-row">
         <div href="#" class="button" data-bind="click: onSelectWindowOkClicked">Ok</div>
         <div href="#" class="button" data-bind="click: onSelectWindowCancelClicked">Cancel</div>
-        <div href="#" class="button" data-bind="click: onSelectWindowResetClicked">Reset</div>
+        <div href="#" class="button button-sm" data-bind="click: onSelectWindowResetClicked">Reset</div>
+        <div href="#" class="button button-sm" data-bind="click: onSelectWindowSelNoneClicked">None</div>
+        <div href="#" class="button button-sm" data-bind="click: onSelectWindowSelAllClicked">All</div>
     </div>
 </div>
                 `;

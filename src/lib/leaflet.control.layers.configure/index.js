@@ -294,7 +294,11 @@ function enableConfig(control, {layers, customLayersOrder}) {
                         maxZoom: 18,
                         isOverlay: false,
                         scaleDependent: false,
-                        isTop: true
+                        isTop: true,
+                        type: 'tiles',
+                        wmsLayers: '',
+                        wmsFormat: '',
+                        wmsTransparent: true,
                     }
                 );
             },
@@ -490,7 +494,19 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     maxZoom: ko.observable(fieldValues.maxZoom),
                     isOverlay: ko.observable(fieldValues.isOverlay),
                     isTop: ko.observable(fieldValues.isTop),
+                    type: ko.observable(fieldValues.type),
+                    wmsLayers: ko.observable(fieldValues.wmsLayers),
+                    wmsFormat: ko.observable(fieldValues.wmsFormat),
+                    wmsTransparent: ko.observable(fieldValues.wmsTransparent),
                     buttons: buttons,
+                    availableWmsData: {
+                        layers: ko.observableArray(),
+                        formats: ko.observableArray(),
+                        selectedLayer: ko.observable(),
+                        selectedFormat: ko.observable(),
+                        received: ko.observable(false),
+                        error: ko.observable(""),
+                    },
                     buttonClicked: function buttonClicked(callbackN) {
                         const fieldValues = {
                             name: dialogModel.name().trim(),
@@ -499,9 +515,81 @@ function enableConfig(control, {layers, customLayersOrder}) {
                             scaleDependent: dialogModel.scaleDependent(),
                             maxZoom: dialogModel.maxZoom(),
                             isOverlay: dialogModel.isOverlay(),
-                            isTop: dialogModel.isTop()
+                            isTop: dialogModel.isTop(),
+                            type: dialogModel.type(),
+                            wmsLayers: dialogModel.wmsLayers(),
+                            wmsFormat: dialogModel.wmsFormat(),
+                            wmsTransparent: dialogModel.wmsTransparent(),
                         };
                         buttons[callbackN].callback(fieldValues);
+                    },
+                    isWMS: function isWMS() {
+                        return this.type() === 'wms';
+                    },
+                    testWMS: function testWMS() {
+                        // get wms capabilities
+                        const url = `${dialogModel.url().split('?')[0]}?request=GetCapabilities&service=WMS`;
+                        const xhr = new XMLHttpRequest();
+                        xhr.onload = () => {
+                            dialogModel.availableWmsData.layers.removeAll();
+                            dialogModel.availableWmsData.formats.removeAll();
+
+                            const capability = xhr.responseXML.getElementsByTagName("GetMap")[0];
+                            if (!capability) {
+                                dialogModel.availableWmsData.error("Failed to get WMS capabilities");
+                                return;
+                            }
+
+                            const validFormats = [
+                                "image/png",
+                                "image/gif",
+                                "image/png",
+                                "image/gif",
+                                "image/jpeg",
+                                "image/svg",
+                            ];
+
+                            for (let format of capability.getElementsByTagName("Format")) {
+                                const formatStr = format.textContent;
+                                if (validFormats.includes(formatStr)) {
+                                    dialogModel.availableWmsData.formats.push(formatStr);
+                                }
+                            }
+
+                            const layers = xhr.responseXML.getElementsByTagName("Layer");
+                            for (let layer of layers) {
+                                if (layer.getAttribute("queryable") === '1') {
+                                    const name = layer.getElementsByTagName('Name')[0].textContent;
+                                    const title = `${layer.getElementsByTagName('Title')[0].textContent} - ${name}`;
+                                    dialogModel.availableWmsData.layers.push({
+                                        name: name,
+                                        title: title
+                                    });
+                                }
+                            }
+
+                            dialogModel.availableWmsData.error("");
+                            dialogModel.availableWmsData.received(true);
+                        };
+                        xhr.onerror = () => {
+                            dialogModel.availableWmsData.error("Failed to get WMS capabilities");
+                            dialogModel.availableWmsData.received(false);
+                        };
+
+                        xhr.open("GET", url);
+                        xhr.responseType = "document";
+                        xhr.send();
+                    },
+                    wmsAppendLayer: function wmsAppendLayer() {
+                        let layersStr = dialogModel.wmsLayers() ?? '';
+                        if (layersStr.trim()) {
+                            layersStr += ',';
+                        }
+                        layersStr += dialogModel.availableWmsData.selectedLayer();
+                        dialogModel.wmsLayers(layersStr);
+                    },
+                    wmsSetFormat: function wmsSetFormat() {
+                        dialogModel.wmsFormat(dialogModel.availableWmsData.selectedFormat());
                     }
                 };
 
@@ -515,6 +603,8 @@ function enableConfig(control, {layers, customLayersOrder}) {
 <label>Layer name<br/>
 <span class="hint">Maximum 40 characters</span><br/>
 <input maxlength="40" class="layer-name" data-bind="value: name"/></label><br/>
+<label ><input type="radio" name="map_type" value="tiles" data-bind="checked: type">Tile Layer</label>
+<label ><input type="radio" name="map_type" value="wms" data-bind="checked: type">WMS</label><br>
 <label>Tile url template<br/><textarea data-bind="value: url" class="layer-url"></textarea></label><br/>
 <label><input type="radio" name="overlay" data-bind="checked: isOverlay, checkedValue: false">Base layer</label><br/>
 <label><input type="radio" name="overlay" data-bind="checked: isOverlay, checkedValue: true">Overlay</label><br/>
@@ -524,11 +614,35 @@ function enableConfig(control, {layers, customLayersOrder}) {
 <label><input type="radio" name="top-or-bottom"
         data-bind="checked: isTop, checkedValue: true, enable: isOverlay">Place above other layers</label><br/>
 <hr/>
-<label><input type="checkbox" data-bind="checked: scaleDependent"/>Content depends on scale(like OSM or Google maps)</label><br/>
-<label><input type="checkbox" data-bind="checked: tms" />TMS rows order</label><br />
 
+<div data-bind="hidden: isWMS()">
+<label><input type="checkbox" data-bind="checked: scaleDependent"/>Content depends on scale(like OSM or Google maps)</label><br/>
+<label><input type="checkbox" data-bind="checked: tms" />TMS rows order</label><br/>
 <label>Max zoom<br>
-<select data-bind="options: [${zooms}], value: maxZoom"></select></label>
+<select data-bind="options: [${zooms}], value: maxZoom,"></select></label>
+</div>
+<div data-bind="visible: isWMS()">
+<b>WMS Settings</b><div class="button button-text button-sm button-right" data-bind="visible: isWMS(), click: testWMS.bind(null)">Get capabilities</div><br>
+<div data-bind="visible: availableWmsData.error">
+<span class="error" data-bind="text: availableWmsData.error"></span>
+</div>
+<label>Layers<br/>
+<input maxlength="120" class="layer-name" data-bind="value: wmsLayers"/></label>
+<div data-bind="visible: availableWmsData.received">
+    <select data-bind="options: availableWmsData.layers(), optionsValue: 'name', optionsText: 'title', value: availableWmsData.selectedLayer"></select>
+    <div class="button button-sm button-plus" data-bind="click: wmsAppendLayer.bind(null)">+</div><br/>
+</div>
+<label>Format<br/>
+<input maxlength="80" class="layer-name" placeholder="image/jpeg" data-bind="value: wmsFormat"/></label>
+<div data-bind="visible: availableWmsData.received">
+<select data-bind="options: availableWmsData.formats(), value: availableWmsData.selectedFormat"></select>
+<div class="button button-sm button-plus" data-bind="click: wmsSetFormat.bind(null)">Set</div><br/>
+</div>
+<label><input type="checkbox" data-bind="checked: wmsTransparent"/> Transparent</label><br/>
+<br/>
+</div>
+</div>
+
 <div data-bind="foreach: buttons">
     <a class="button" data-bind="click: $root.buttonClicked.bind(null, $index()), text: caption"></a>
 </div>`;
@@ -690,7 +804,30 @@ function enableConfig(control, {layers, customLayersOrder}) {
 
             createCustomLayer: function(fieldValues) {
                 const serialized = this.serializeCustomLayer(fieldValues);
-                const tileLayer = new L.Layer.CustomLayer(fieldValues.url, {
+                let tileLayer;
+
+                if (fieldValues.type === 'wms') {
+                    const options = {
+                        isOverlay: fieldValues.isOverlay,
+                        maxNativeZoom: fieldValues.maxZoom,
+                        maxZoom: config.maxZoom,
+                        code: serialized,
+                        layers: fieldValues.wmsLayers,
+                        format: fieldValues.wmsFormat,
+                        transparent: fieldValues.wmsTransparent,
+                    };
+                    Object.keys(options).forEach((key) => {
+                        if (options[key] === '') {
+                          delete options[key];
+                        }
+                      });
+                    tileLayer = L.tileLayer.wms(fieldValues.url.split('?')[0], options);
+                    delete tileLayer.wmsParams['isOverlay'];
+                    delete tileLayer.wmsParams['maxNativeZoom'];
+                    delete tileLayer.wmsParams['maxZoom'];
+                    delete tileLayer.wmsParams['code'];
+                } else {
+                    tileLayer = new L.Layer.CustomLayer(fieldValues.url, {
                         isOverlay: fieldValues.isOverlay,
                         tms: fieldValues.tms,
                         maxNativeZoom: fieldValues.maxZoom,
@@ -701,8 +838,8 @@ function enableConfig(control, {layers, customLayersOrder}) {
                         code: serialized,
                         noCors: true,
                         isTop: fieldValues.isTop
-                    }
-                );
+                    });
+                }
 
                 const customLayer = {
                     title: fieldValues.name,

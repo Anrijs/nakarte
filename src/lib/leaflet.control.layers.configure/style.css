@@ -15,9 +15,13 @@
     margin-right: 4px;
 }
 
-.button-text {
-    width: auto !important;
+.button.button-text {
+    width: auto;
     padding: 0 4px;
+}
+
+.button.button-right {
+    float: right;
 }
 
 .button-active {
@@ -159,7 +163,6 @@
     font-size: 12px;
 }
 
-
 .leaflet-layers-select-window .button:hover {
     background-color: #f4f4f4;
 }
@@ -289,4 +292,9 @@
 .custom-layers-window .hint {
     font-size: 10px;
     color: #777;
+}
+
+.custom-layers-window .error {
+    font-size: 10px;
+    color: #B00020;
 }

@@ -105,7 +105,7 @@ function enableHotKeys(control) {
                 this._keyDown = null;
                 const targetTag = e.target.tagName.toLowerCase();
                 if (
-                    (targetTag === 'input' && ['text', 'search'].includes(e.target.type)) ||
+                    (targetTag === 'input' && ['text', 'search', 'number'].includes(e.target.type)) ||
                     targetTag === 'textarea' ||
                     pressedKey !== e.keyCode
                 ) {

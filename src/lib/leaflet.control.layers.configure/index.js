@@ -35,6 +35,14 @@ function enableConfig(control, {layers, customLayersOrder}) {
             },
 
             _onKeyDown: function(e) {
+                const targetTag = e.target.tagName.toLowerCase();
+                if (
+                    (targetTag === 'input' && ['text', 'search', 'number'].includes(e.target.type)) ||
+                    targetTag === 'textarea'
+                ) {
+                    return;
+                }
+
                 if (typeof this._layerIndex === 'undefined') {
                     this._layerIndex = -1;
                 }

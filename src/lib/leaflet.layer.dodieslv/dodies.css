@@ -1,0 +1,79 @@
+.dodi-marker {
+    width: 28px;
+    height: 28px;
+    margin-left: -14px;
+    margin-top: -14px;
+    background-repeat: no-repeat;
+    background-size: contain;
+}
+
+.dodies-marker-boot {
+    background-image: url("boot.png");
+}
+
+.dodies-marker-trail {
+    background-image: url("trail.png");
+}
+
+.dodies-marker-binoculars {
+    background-image: url("binoculars.png");
+}
+
+.dodies-marker-picnic {
+    background-image: url("picnic-table.png");
+}
+
+.dodies-popup .header {
+    width: 100%;
+    min-height: 250px;
+    background-size: cover;
+    background-position: center;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+.dodies-popup .contents {
+    padding: 12px;
+    font-size: 1.2em;
+}
+
+.dodies-popup .leaflet-popup-content {
+    margin: 0;
+}
+
+.dodies-popup .leaflet-popup-content-wrapper {
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0;
+}
+
+.dodies-popup .btn, .dodies-popup .dist {
+    font-size: 1.2em;
+    border-radius: 8px;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.dodies-popup .btn {
+    padding: 6px;
+    border: solid 1px #1b5bd1;
+    background: #2567e0;
+    color: #fff;
+}
+
+.dodies-popup .btn:hover {
+    background: #1b5bd1;
+}
+
+.dodies-popup .dist {
+    padding: 4px 6px;
+    margin-top: 16px;
+    background: #e9e9e9;
+    color: rgb(99, 99, 99);
+    font-size: 1.1em;
+}
+
+.dodies-popup .dist:hover {
+    cursor: pointer;
+    background: #d4d4d4;
+}

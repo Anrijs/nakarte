@@ -146,7 +146,7 @@ function setUp() { // eslint-disable-line complexity
     enableLayersControlHotKeys(layersControl);
     enableLayersControlAdaptiveHeight(layersControl);
     enableLayersMinimize(layersControl);
-    enableLayersConfig(layersControl, getLayers());
+    enableLayersConfig(layersControl, getLayers(tracklist));
     layersControl.enableHashState('l');
 
     /* controls bottom-left corner */

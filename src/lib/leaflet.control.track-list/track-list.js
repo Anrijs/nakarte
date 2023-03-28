@@ -299,7 +299,7 @@ L.Control.TrackList = L.Control.extend({
             readFiles(files).then(function(fileDataArray) {
                 const geodataArray = [];
                 for (let fileData of fileDataArray) {
-                        geodataArray.push(...parseGeoFile(fileData.filename, fileData.data));
+                        geodataArray.push(...parseGeoFile(fileData.filename, fileData.data, this));
                 }
                 this.readingFiles(this.readingFiles() - 1);
 

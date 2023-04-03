@@ -211,7 +211,18 @@ function parseCsv(txt, filename, control) {
         ko.applyBindings(dialogModel, form);
     }
 
-    const delimiter = query('Atdalītāls / delimiter: ', ',');
+    // try to detect delimiter
+    const lines = txt.split('\n');
+    let max = [',', 0];
+
+    [',', ';', '|'].forEach((d) => {
+        const count = lines[0].split(d).length;
+        if (count > max[1]) {
+            max = [d, count];
+        }
+    });
+
+    const delimiter = query('Atdalītāls / delimiter: ', max[0]);
     const data = csv2array(txt, delimiter);
 
     if (data.length < 1 || data[0].length < 2) {

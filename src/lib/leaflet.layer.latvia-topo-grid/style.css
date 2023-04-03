@@ -1,0 +1,36 @@
+.leaflet-tksgrid-quadtitle-1, .leaflet-tksgrid-quadtitle-2 {
+	width: 100px;
+	height: 50px;
+	margin-left: -50px;
+	margin-top: -25px;
+	text-align: center;
+	line-height: 50px;
+	font-family: Times, serif;
+	font-weight: bold;
+	outline: none;
+
+	text-shadow: 1px  0    0.5px   #eee,
+                 1px  1px  0.5px   #eee,
+                 0    1px  0.5px   #eee,
+                 -1px 1px  0.5px   #eee,
+                 -1px 0    0.5px   #eee,
+                 -1px -1px 0.5px   #eee,
+                 0    -1px 0.5px   #eee,
+                 1px  -1px 0.5px   #eee;
+    white-space: nowrap;
+}
+.leaflet-tksgrid-quadtitle-1 {
+    font-size: 14px;
+}
+
+.leaflet-tksgrid-quadtitle-2 {
+	font-size: 32px;
+}
+
+.leaflet-tksgrid-label-10k,
+.leaflet-tksgrid-label-5k,
+.leaflet-tksgrid-label-2k,
+.leaflet-tksgrid-label-1k,
+.leaflet-tksgrid-label-5c {
+    font-size: 18px;
+}

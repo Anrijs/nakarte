@@ -1,12 +1,15 @@
 import ko from 'knockout';
 import L from 'leaflet';
 
+import {lks2wgs} from '~/lib/lks92';
 import * as logging from '~/lib/logging';
 import {fetch} from '~/lib/xhr-promise';
 
 import {BaseProvider} from '../remoteBase';
 
+// https://icons8.com/icons/fluency
 const icons = {
+    'geodez': 'location',
     'viensēta': 'house-with-a-garden',
     'skrajciems': 'village',
     'upe': 'creek',
@@ -143,6 +146,16 @@ const GeoLatvijaProvider = BaseProvider.extend({
 
             if (it.stavoklis.trim() !== 'pastāv') {
                 html += `<br>- Stāvoklis: ${it.stavoklis}`;
+            }
+
+            if (it.rawdesc && it.rawdesc.length > 0) {
+                html = `${it.rawdesc}`;
+            }
+
+            if (it.epsg && it.epsg === '3059') {
+                const latlon = lks2wgs(it.x, it.y);
+                it.latitude = latlon[0];
+                it.longitude = latlon[1];
             }
 
             let iconcss = null;

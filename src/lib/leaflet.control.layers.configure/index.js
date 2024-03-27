@@ -128,6 +128,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
 
                 for (let layer of [...this._allLayers, ...this._customLayers()]) {
                     let enabled = storedLayersEnabled2[layer.layer.options.code];
+                    let collapsed = false;
                     // if storage is empty enable only default layers
                     // if new default layer appears it will be enabled
                     if (typeof enabled === 'undefined') {
@@ -135,6 +136,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     }
                     layer.enabled = enabled;
                     layer.checked = ko.observable(enabled);
+                    layer.collapsed = ko.observable(collapsed);
                     layer.description = layer.description || '';
                     layer.__compareSide = 'L';
                 }
@@ -167,6 +169,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     self: this,
                     layerGroups: layerGroups,
                     customLayers: this._customLayers,
+                    query: ko.observable(''),
                     onSelectWindowCancelClicked: function() {
                         dialogModel.self.hideSelectWindow();
                     },
@@ -217,8 +220,105 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     },
                     toggledHtml: function(grp) {
                         return grp.collapsed() ? "[+]" : "[-]";
+                    },
+                    onQueryChange() {
+                        let query = this.query();
+                        for (let grp of dialogModel.layerGroups) {
+                            grp.collapsed(false);
+                        }
+                        for (let lyr of [...dialogModel.self._allLayers, ...dialogModel.self._customLayers()]) {
+                            let text = dialogModel.__transliterate(lyr.title);
+                            lyr.collapsed(query && !dialogModel.__match(query, text));
+                        }
+                    },
+                    onQueryClearClick: function() {
+                        this.query('');
+                    },
+                    __match: function(query, text) {
+                        query = query.toLowerCase();
+                        text = text.toLowerCase();
+                        return text.includes(query);
+                    },
+                    __transliterate: function(text) {
+                        const a = {};
+                        a['а'] = 'a';
+                        a['А'] = 'А';
+                        a['Б'] = 'B';
+                        a['б'] = 'b';
+                        a['В'] = 'V';
+                        a['в'] = 'v';
+                        a['Г'] = 'G';
+                        a['г'] = 'g';
+                        a['Ґ'] = 'G';
+                        a['ґ'] = 'g';
+                        a['Д'] = 'D';
+                        a['д'] = 'd';
+                        a['Е'] = 'E';
+                        a['е'] = 'e';
+                        a['Ё'] = 'YO';
+                        a['ё'] = 'yo';
+                        a['є'] = 'ie';
+                        a['Є'] = 'Ye';
+                        a['Ж'] = 'ZH';
+                        a['ж'] = 'zh';
+                        a['З'] = 'Z';
+                        a['з'] = 'z';
+                        a['И'] = 'I';
+                        a['и'] = 'i';
+                        a['І'] = 'I';
+                        a['і'] = 'i';
+                        a['ї'] = 'i';
+                        a['Ї'] = 'Yi';
+                        a['Й'] = 'I';
+                        a['й'] = 'i';
+                        a['К'] = 'K';
+                        a['к'] = 'k';
+                        a['Л'] = 'L';
+                        a['л'] = 'l';
+                        a['М'] = 'M';
+                        a['м'] = 'm';
+                        a['Н'] = 'N';
+                        a['н'] = 'n';
+                        a['О'] = 'O';
+                        a['о'] = 'o';
+                        a['П'] = 'P';
+                        a['п'] = 'p';
+                        a['Р'] = 'R';
+                        a['р'] = 'r';
+                        a['С'] = 'S';
+                        a['с'] = 's';
+                        a['Т'] = 'T';
+                        a['т'] = 't';
+                        a['У'] = 'U';
+                        a['у'] = 'u';
+                        a['Ф'] = 'F';
+                        a['ф'] = 'f';
+                        a['Х'] = 'H';
+                        a['х'] = 'h';
+                        a['Ц'] = 'TS';
+                        a['ц'] = 'ts';
+                        a['Ч'] = 'CH';
+                        a['ч'] = 'ch';
+                        a['Ш'] = 'SH';
+                        a['ш'] = 'sh';
+                        a['Щ'] = 'SCH';
+                        a['щ'] = 'sch';
+                        a['Ы'] = "I";
+                        a['ы'] = "i";
+                        a['Э'] = 'E';
+                        a['э'] = 'e';
+                        a['Ю'] = 'YU';
+                        a['ю'] = 'yu';
+                        a['Я'] = 'Ya';
+                        a['я'] = 'ya';
+
+                        return text.split("")
+                            .map((char) => a[char] || char)
+                            .join("");
                     }
                 };
+
+                dialogModel.query.subscribe(dialogModel.onQueryChange.bind(dialogModel));
 
                 const container = this._configWindow =
                     L.DomUtil.create('div', 'leaflet-layers-dialog-wrapper');
@@ -227,6 +327,11 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     .disableScrollPropagation(container);
                 container.innerHTML = `
 <div class="leaflet-layers-select-window">
+    <div class="leaflet-search-input-wrapper">
+        <input tabindex="-1" type="search" class="leaflet-search-input"
+            placeholder="Meklēt slāni" title="" data-bind="textInput: query">
+        <div class="leaflet-search-clear-button" data-bind="visible: query, click: onQueryClearClick"></div>
+    </div>
     <form>
         <!-- ko foreach: { data:layerGroups, as: 'grp' } -->
             <div class="section-header section-header-toggle" data-bind="click: $parent.toggleLayer">
@@ -236,7 +341,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
                 </label>
             </div>
             <!-- ko foreach: layers -->
-                <label style="margin-left: 16px;" data-bind="if: !grp.collapsed()">
+                <label style="margin-left: 16px;" data-bind="if: (!grp.collapsed() && !collapsed())">
                     <input type="checkbox" data-bind="checked: checked"/>
                     <span data-bind="text: title">
                     </span><!--  ko if: description -->
@@ -247,7 +352,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
         <!-- /ko -->
         <div data-bind="if: customLayers().length" class="section-header">Custom layers</div>
         <!-- ko foreach: customLayers -->
-                <label>
+                <label data-bind="if: !collapsed()">
                     <input type="checkbox" data-bind="checked: checked"/>
                     <span data-bind="text: title"></span>
                 </label>

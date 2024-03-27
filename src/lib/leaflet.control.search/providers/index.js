@@ -1,12 +1,14 @@
 import {CoordinatesProvider} from './coordinates';
 import {GeoLatvijaProvider} from './geolatvija';
+import {KadastrsProvider} from './kadastrs';
 import {LinksProvider} from './links';
-import {MapyCzProvider} from './mapycz';
+// import {MapyCzProvider} from './mapycz';
 // import {PhotonProvider} from './photon';
 
 const providers = {
     geolatvija: GeoLatvijaProvider,
-    mapycz: MapyCzProvider,
+    kadastrs: KadastrsProvider,
+    // mapycz: MapyCzProvider,
     // photon: PhotonProvider,
 };
 

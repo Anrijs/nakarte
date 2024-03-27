@@ -9,10 +9,10 @@ const PhotonProvider = BaseProvider.extend({
     name: 'Photon',
 
     options: {
-        apiUrl: 'https://photon.komoot.de/api/',
+        apiUrl: 'https://photon.komoot.io/api/',
         attribution: {
             text: 'Photon by Komoot',
-            url: 'https://photon.komoot.de/',
+            url: 'https://photon.komoot.io/',
         },
         delay: 700,
         languages: ['en', 'de', 'fr', 'it'],
@@ -78,13 +78,16 @@ const PhotonProvider = BaseProvider.extend({
             }
             category = category.replace('_', ' ');
             return {
-                title,
                 latlng: L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]),
-                bbox,
-                category,
-                address,
-                zoom,
+                title: title,
+                category: category,
+                address: address,
+                subtitle: null,
+                extra: null,
                 icon: null,
+                iconcss: null,
+                bbox,
+                zoom,
             };
         });
         return {results: places};

@@ -831,7 +831,8 @@ function enableConfig(control, {layers, customLayersOrder}) {
                         this.onLayerSideClicked(obj, editButton, e)
                     );
                 }
-                if (obj.layer.options.isOverlay && !obj.layer.options.noOpacity) {
+                if (obj.layer.options.isOverlay &&
+                    !obj.layer.options.noOpacity && typeof obj.layer.setOpacity === 'function') {
                     const settingsButton = L.DomUtil.create(
                         'div',
                         'layer-extra-button layer-extra-button-text icon-opacity',
@@ -839,12 +840,15 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     );
                     settingsButton.title = 'Opacity';
 
-                    const opacityValue = L.DomUtil.create('span', 'layer-opacity-value', settingsButton);
-                    opacityValue.innerText = (obj.layer.options.opacity * 100) + "%";
+                    if (typeof obj.layer.setOpacity === 'function') {
+                        const opacityValue = L.DomUtil.create('span', 'layer-opacity-value', settingsButton);
+                        const opacityPercent = isNaN(obj.layer.options.opacity) ? 100 : obj.layer.options.opacity * 100;
+                        opacityValue.innerText = opacityPercent + "%";
 
-                    L.DomEvent.on(settingsButton, 'click', (e) =>
-                        this.onOpacityEditClicked(obj.layer, opacityValue, e)
-                    );
+                        L.DomEvent.on(settingsButton, 'click', (e) =>
+                            this.onOpacityEditClicked(obj.layer, opacityValue, e)
+                        );
+                    }
                 }
                 if (obj.layer._justAdded) {
                     L.DomUtil.addClass(label, 'leaflet-layers-configure-just-added-1');

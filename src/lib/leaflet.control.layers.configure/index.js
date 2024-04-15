@@ -236,6 +236,9 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     onQueryClearClick: function() {
                         this.query('');
                     },
+                    onFormKeyDown: function(_unused_data, event) {
+                        return event.keyCode !== 13;
+                    },
                     __match: function(query, text) {
                         query = query.toLowerCase();
                         text = text.toLowerCase();
@@ -329,12 +332,12 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     .disableScrollPropagation(container);
                 container.innerHTML = `
 <div class="leaflet-layers-select-window">
-    <div class="leaflet-search-input-wrapper">
-        <input tabindex="-1" type="search" class="leaflet-search-input"
-            placeholder="Meklēt slāni" title="" data-bind="textInput: query">
-        <div class="leaflet-search-clear-button" data-bind="visible: query, click: onQueryClearClick"></div>
-    </div>
-    <form>
+    <form data-bind="event: {keydown:onFormKeyDown}">
+        <div class="leaflet-search-input-wrapper">
+            <input tabindex="-1" type="search" class="leaflet-search-input"
+                placeholder="Meklēt slāni" title="" data-bind="textInput: query"">
+            <div class="leaflet-search-clear-button" data-bind="visible: query, click: onQueryClearClick"></div>
+        </div>
         <!-- ko foreach: { data:layerGroups, as: 'grp' } -->
             <div class="section-header section-header-toggle" data-bind="click: $parent.toggleLayer">
                 <label>

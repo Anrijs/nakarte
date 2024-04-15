@@ -76,28 +76,30 @@ function enableConfig(control, {layers, customLayersOrder}) {
             },
 
             __injectConfigButton: function() {
-                const configButton = L.DomUtil.create('div', 'button icon-settings');
-                configButton.title = 'Configure layers';
+                const configButton = L.DomUtil.create('div', 'button icon-settings button-text-icon-left');
+                configButton.title = 'Pielāgot slāņus';
+                configButton.innerText = "Citi slāņi";
                 this._topRow.appendChild(configButton);
                 L.DomEvent.on(configButton, 'click', this._onConfigButtonClick, this);
 
-                const newCustomLayerButton = L.DomUtil.create('div', 'button icon-edit');
-                newCustomLayerButton.title = 'Add custom layer';
+                const newCustomLayerButton = L.DomUtil.create('div', 'button icon-edit button-text-icon-left');
+                newCustomLayerButton.title = 'Pievienot pielāgotu slāni';
+                newCustomLayerButton.innerText = "Jauns slānis";
                 this._topRow.appendChild(newCustomLayerButton);
                 L.DomEvent.on(newCustomLayerButton, 'click', this.onCustomLayerCreateClicked, this);
 
                 const compareButton = L.DomUtil.create('div', 'button button-text');
-                compareButton.title = 'Add custom layer';
-                compareButton.innerText = "Compare";
+                compareButton.title = 'Salīdzināt slāņus';
+                compareButton.innerText = "Salīdzināt";
                 this._topRow.appendChild(compareButton);
                 L.DomEvent.on(compareButton, 'click', this.onCompareButtonClicked, this);
 
                 const compareSliderButton = L.DomUtil.create('div', 'button button-alt icon-split');
-                compareSliderButton.title = 'Split View';
+                compareSliderButton.title = 'Sadalīts skats';
                 L.DomEvent.on(compareSliderButton, 'click', this.onCompareModeClicked, this);
 
                 const compareMagnifyButton = L.DomUtil.create('div', 'button button-alt icon-layer-search');
-                compareMagnifyButton.title = 'Explore View';
+                compareMagnifyButton.title = 'Izpētes skats';
                 L.DomEvent.on(compareMagnifyButton, 'click', this.onCompareModeClicked, this);
 
                 this.__compareButtons = [

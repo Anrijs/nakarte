@@ -20,7 +20,7 @@ async function getMapillary() {
             ),
         import(
             /* webpackChunkName: "mapillary" */
-            'mapillary-js/dist/mapillary.css'
+            'mapillary-js/dist/mapillary.min.css'
             ),
     ]);
     return mapillary;

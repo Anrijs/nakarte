@@ -129,7 +129,8 @@ class DodiesLvLayer extends L.Layer {
     _makeMarker(geojsonPoint, latlng) {
         let klassName = 'dodi-marker ';
         const type = geojsonPoint.properties.ti;
-        if (type === 'taka') {
+
+        if (type === 'taka' || type === 'pargajiens') {
             if (geojsonPoint.properties.ma === 'Pārgājiens') {
                 klassName += 'dodies-marker-boot';
             } else {
@@ -139,8 +140,6 @@ class DodiesLvLayer extends L.Layer {
             klassName += 'dodies-marker-binoculars';
         } else if (type === 'pikniks') {
             klassName += 'dodies-marker-picnic';
-        } else {
-            return null;
         }
 
         const icon = L.divIcon({
@@ -148,7 +147,13 @@ class DodiesLvLayer extends L.Layer {
             iconSize: [28, 28],
         });
         const marker = L.marker(latlng, {icon: icon});
-        marker.bindTooltip(geojsonPoint.properties.na);
+
+        if (type === 'taka' || type === 'pargajiens') {
+            marker.bindTooltip(geojsonPoint.properties.na + ' (' + geojsonPoint.properties.km + ' km)');
+        } else {
+            marker.bindTooltip(geojsonPoint.properties.na);
+        }
+
         return marker;
     }
 

@@ -973,6 +973,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
                         (fieldValues.isOverlay && fieldValues.isTop) ? customLayersOrder.top : customLayersOrder.bottom,
                     fieldValues: fieldValues,
                     enabled: true,
+                    collapsed: ko.observable(false),
                     checked: ko.observable(true)
                 };
                 tileLayer.__customLayer = customLayer;

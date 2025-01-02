@@ -119,6 +119,7 @@ module.exports = [
     'src/lib/leaflet.control.layers.minimize/index.js',
     'src/lib/stripBom/index.js',
     'src/lib/leaflet.control.layers.events/index.js',
+    'src/lib/leaflet.layer.protomaps/index.js',
     'src/lib/leaflet.layer.rasterize/CanvasMarkers.js',
     'src/lib/leaflet.layer.rasterize/imgFromDataString.js',
     'src/lib/leaflet.layer.rasterize/WestraPasses.js',

@@ -7,7 +7,7 @@ const protobufFiles = './src/**/*_pb.js';
 
 module.exports = {
     root: true,
-    ignorePatterns: ['node_modules', 'build', 'deploy'],
+    ignorePatterns: ['node_modules', 'build', 'deploy', '**/*.min.js'],
     extends: ['./eslint_rules/base.js', './eslint_rules/imports.js'],
     overrides: [
         /* all new js code */

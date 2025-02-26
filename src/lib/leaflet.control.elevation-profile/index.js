@@ -5,6 +5,7 @@ import '~/lib/leaflet.control.commons';
 import {notify} from '~/lib/notifications';
 import * as logging from '~/lib/logging';
 import {DragEvents} from '~/lib/leaflet.events.drag';
+import config from '~/config';
 
 function calcSamplingInterval(length) {
     var targetPointsN = 2000;
@@ -91,6 +92,7 @@ const ElevationProfile = L.Class.extend({
 
         initialize: function(map, latlngs, options) {
             L.setOptions(this, options);
+            this.map = map;
             this.path = latlngs;
             var samples = this.samples = pathRegularSamples(this.path, this.options.samplingInterval);
             samples = samples.map((latlng) => latlng.wrap());
@@ -98,24 +100,40 @@ const ElevationProfile = L.Class.extend({
                 notify('Track is empty');
                 return;
             }
-            var that = this;
             this.horizZoom = 1;
             this.dragStart = null;
-            new ElevationProvider().get(samples)
+
+            this.elevationServer = config.elevationServer;
+            if (Array.isArray(this.elevationServer)) {
+                this.elevationServer = this.elevationServer[0].url;
+            }
+
+            const that = this;
+            this.getElevationData(this.elevationServer, function() {
+                that._addTo(that.map);
+            });
+
+            this.values = null;
+            this.settings = {
+                towerStart: 0,
+                towerEnd: 0,
+            };
+        },
+
+        getElevationData: function(server, onload = undefined) {
+            const that = this;
+            new ElevationProvider(server).get(this.samples)
                 .then(function(values) {
                         that.values = values;
-                        that._addTo(map);
+                        if (onload) {
+                            onload();
+                        }
                     }
                 )
                 .catch((e) => {
                     logging.captureException(e, 'error getting elevation');
                     notify(`Failed to get elevation data: ${e.message}`);
                 });
-            this.values = null;
-            this.settings = {
-                towerStart: 0,
-                towerEnd: 0,
-            };
         },
 
         _onWindowResize: function() {
@@ -170,6 +188,7 @@ const ElevationProfile = L.Class.extend({
             var horizZoom = this.horizZoom = 1;
             var container = this._container;
             this.leftContainer = L.DomUtil.create('div', 'elevation-profile-properties', container);
+            this.providerSelector = L.DomUtil.create('select', 'elevation-profile-server', this.leftContainer);
             this.propsContainer = L.DomUtil.create('div', '', this.leftContainer);
             this.leftAxisLables = L.DomUtil.create('div', 'elevation-profile-left-axis', container);
             this.closeButton = L.DomUtil.create('div', 'elevation-profile-close', container);
@@ -222,6 +241,24 @@ const ElevationProfile = L.Class.extend({
             this.towerEnd.value = this.settings.towerEnd;
             this.towerStart.dataset['target'] = 'towerStart';
             this.towerEnd.dataset['target'] = 'towerEnd';
+
+            for (let i = 0; i < config.elevationsServer.length; i++) {
+                const srv = config.elevationsServer[i];
+                const option = L.DomUtil.create('option', '', null);
+                option.value = srv.url;
+                option.text = srv.name;
+                if (srv.url === this.elevationServer) {
+                    option.selected = "yes";
+                }
+                this.providerSelector.add(option);
+            }
+
+            const that = this;
+            this.providerSelector.onchange = function(e) {
+                that.elevationServer = e.target.value;
+                that.getElevationData(that.elevationServer, that.updateGraph.bind(that));
+                return true;
+            };
 
             L.DomEvent.on(this.towerStart, 'change', this.onSettingsChange, this);
             L.DomEvent.on(this.towerEnd, 'change', this.onSettingsChange, this);
@@ -453,7 +490,7 @@ const ElevationProfile = L.Class.extend({
 
             this.propsContainer.innerHTML = `
                 <table>
-                <tr><td>Max elevation:</td><td>${d.maxElev}</td></tr>
+                <tr class="start-group"><td>Max elevation:</td><td>${d.maxElev}</td></tr>
                 <tr><td>Min elevation:</td><td>${d.minElev}</td></tr>
                 <tr class="start-group"><td>Start elevation:</td><td>${d.startApprox}${d.startElev}</td></tr>
                 <tr><td>Finish elevation:</td><td>${d.endApprox}${d.endElev}</td></tr>

@@ -32,7 +32,14 @@ function preconnect(url) {
     document.head.appendChild(dnsPrefetchLink);
 }
 
-preconnect(config.elevationsServer);
+if (Array.isArray(config.elevationsServer)) {
+    for (let i = 0; i < config.elevationsServer.length; i++) {
+        const srv = config.elevationsServer[i];
+        preconnect(srv.url);
+    }
+} else {
+    preconnect(config.elevationsServer);
+}
 preconnect(config.CORSProxyUrl);
 preconnect(config.tracksStorageServer);
 

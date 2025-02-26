@@ -5,7 +5,11 @@ class ElevationProvider {
     chunkSize = 10000;
 
     constructor(serverUrl = config.elevationsServer) {
-        this.url = serverUrl;
+        if (Array.isArray(serverUrl)) {
+            this.url = serverUrl[0].url;
+        } else {
+            this.url = serverUrl;
+        }
     }
 
     async get(latlngs) {

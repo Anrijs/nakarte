@@ -84,7 +84,7 @@ function pathRegularSamples(latlngs, step) {
 const ElevationProfile = L.Class.extend({
         options: {
             samplingInterval: 50,
-            sightLine: false
+            sightLine: false,
         },
 
         includes: L.Mixin.Events,
@@ -112,6 +112,10 @@ const ElevationProfile = L.Class.extend({
                     notify(`Failed to get elevation data: ${e.message}`);
                 });
             this.values = null;
+            this.settings = {
+                towerStart: 0,
+                towerEnd: 0,
+            };
         },
 
         _onWindowResize: function() {
@@ -142,7 +146,14 @@ const ElevationProfile = L.Class.extend({
                         '<div class="elevation-profile-marker-label"></div>'
                 }
             );
+            const iconIntersection = L.divIcon({
+                className: 'elevation-profile-marker',
+                html:
+                    '<div class="elevation-profile-marker-intersection-icon"></div>'
+            }
+        );
             this.trackMarker = L.marker([1000, 0], {interactive: false, icon: icon});
+            this.intersectionMarker = L.marker([1000, 0], {interactive: false, icon: iconIntersection});
             this.polyline = L.polyline(this.path, {weight: 30, opacity: 0}).addTo(map);
             this.polyline.on('mousemove', this.onLineMouseMove, this);
             this.polyline.on('mouseover', this.onLineMouseEnter, this);
@@ -151,10 +162,15 @@ const ElevationProfile = L.Class.extend({
             return this;
         },
 
+        isSightlineVisible: function() {
+            return this.options.sightLine || this.settings.towerStart !== 0 || this.settings.towerEnd !== 0;
+        },
+
         setupContainerLayout: function() {
             var horizZoom = this.horizZoom = 1;
             var container = this._container;
-            this.propsContainer = L.DomUtil.create('div', 'elevation-profile-properties', container);
+            this.leftContainer = L.DomUtil.create('div', 'elevation-profile-properties', container);
+            this.propsContainer = L.DomUtil.create('div', '', this.leftContainer);
             this.leftAxisLables = L.DomUtil.create('div', 'elevation-profile-left-axis', container);
             this.closeButton = L.DomUtil.create('div', 'elevation-profile-close', container);
             L.DomEvent.on(this.closeButton, 'click', this.onCloseButtonClick, this);
@@ -187,6 +203,37 @@ const ElevationProfile = L.Class.extend({
             this.svgDragEvents.on('click', this.onSvgClick, this);
             L.DomEvent.on(svg, 'dblclick', this.onSvgDblClick, this);
             L.DomEvent.on(window, 'resize', this._onWindowResize, this);
+
+            this.inputsTable = L.DomUtil.create('table', 'elevation-profile-inputs', this.leftContainer);
+            this.inputsTable.innerHTML = `
+                <table class="elevation-profile-inputs">
+                <tr class="start-group"><td>Tower Start (m)</td><td>Tower End (m)</td></tr>
+                </table>
+                `;
+
+            const inputRow = this.inputsTable.insertRow();
+            const startCell = inputRow.insertCell();
+            const endCell = inputRow.insertCell();
+            this.towerStart = L.DomUtil.create('input', '', startCell);
+            this.towerEnd = L.DomUtil.create('input', '', endCell);
+            this.towerStart.type = 'number';
+            this.towerEnd.type = 'number';
+            this.towerStart.value = this.settings.towerStart;
+            this.towerEnd.value = this.settings.towerEnd;
+            this.towerStart.dataset['target'] = 'towerStart';
+            this.towerEnd.dataset['target'] = 'towerEnd';
+
+            L.DomEvent.on(this.towerStart, 'change', this.onSettingsChange, this);
+            L.DomEvent.on(this.towerEnd, 'change', this.onSettingsChange, this);
+        },
+
+        onSettingsChange: function(e) {
+            let value = e.target.value;
+            if (e.target.type === 'number') {
+                value = parseFloat(value);
+            }
+            this.settings[e.target.dataset['target']] = value;
+            this.updateGraph();
         },
 
         removeFrom: function(map) {
@@ -589,6 +636,23 @@ const ElevationProfile = L.Class.extend({
             return stats;
         },
 
+        setIntersectionPostition: function(ind) {
+            if (!this._map || !this.values) {
+                return;
+            }
+            let markerPos;
+            if (ind < 0) {
+                this._map.removeLayer(this.intersectionMarker);
+                return;
+            } else if (ind >= this.samples.length - 1) {
+                markerPos = this.samples[this.samples.length - 1];
+            } else {
+                markerPos = this.samples[ind];
+            }
+            this.intersectionMarker.setLatLng(markerPos);
+            this._map.addLayer(this.intersectionMarker);
+        },
+
         setCursorPosition: function(ind) {
             if (!this._map || !this.values) {
                 return;
@@ -758,10 +822,20 @@ const ElevationProfile = L.Class.extend({
                 this.leftAxisLables.removeChild(this.leftAxisLables.lastChild);
             }
 
+            let y0 = null;
+            let y1 = null;
+            if (this.values.length > 0) {
+                y0 = this.values[0] + this.settings.towerStart;
+                y1 = this.values[this.values.length - 1] + this.settings.towerEnd;
+            }
+
             var maxValue = Math.max.apply(null, this.values),
                 minValue = Math.min.apply(null, this.values),
                 svg = this.svg,
                 path, i, horizStep, verticalMultiplier, x, y, gridValues, label;
+
+            maxValue = Math.max(maxValue, y0, y1);
+            minValue = Math.min(minValue, y0, y1);
 
             var paddingBottom = 8 + 16,
                 paddingTop = 8;
@@ -808,17 +882,55 @@ const ElevationProfile = L.Class.extend({
             path = path.join('');
             createSvg('path', {'d': path, 'stroke-width': '1px', 'stroke': 'brown', 'fill': 'none'}, svg);
             // sightline
-            if (this.options.sightLine) {
+            if (this.isSightlineVisible()) {
+                // 0.5m extra
+                const y1 = this.values[0] + this.settings.towerStart + 0.5;
+                const y2 = this.values[this.values.length - 1] + this.settings.towerEnd + 0.5;
                 path = L.Util.template('M{x1} {y1} L{x2} {y2}', {
                         x1: 0,
-                        x2: this.svgWidth * this.horizZoom,
-                        y1: valueToSvgCoord(this.values[0]),
-                        y2: valueToSvgCoord(this.values[this.values.length - 1])
+                        x2: horizStep * this.values.length,
+                        y1: valueToSvgCoord(y1),
+                        y2: valueToSvgCoord(y2)
                     }
                 );
+                let strokeColor = '#94b1ff';
+                let intersectX = -1;
+                const visStep = (y2 - y1) / this.values.length;
+                for (i = 0; i < this.values.length; i++) {
+                    const yTerrain = this.values[i];
+                    const yVisibility = y1 + (i * visStep);
+
+                    if (yTerrain > yVisibility) {
+                        intersectX = i;
+                        strokeColor = '#ff8844';
+                        break;
+                    }
+                }
+
+                this.setIntersectionPostition(intersectX);
+                if (intersectX > 0) {
+                    let x = ((this.svgWidth) / this.values.length) * intersectX;
+                    let intersectPath = L.Util.template('M{x1} {y1} L{x2} {y2}', {
+                        x1: x,
+                        x2: x,
+                        y1: 0,
+                        y2: this.svgHeight
+                    });
+                    createSvg(
+                        'path',
+                        {
+                            'd': intersectPath,
+                            'stroke-width': '1px',
+                            'stroke': '#ff4411',
+                            'fill': 'none',
+                            'stroke-opacity': '0.8'
+                        },
+                        svg
+                    );
+                }
                 createSvg(
                     'path',
-                    {'d': path, 'stroke-width': '3px', 'stroke': '#94b1ff', 'fill': 'none', 'stroke-opacity': '0.5'},
+                    {'d': path, 'stroke-width': '2px', 'stroke': strokeColor, 'fill': 'none', 'stroke-opacity': '0.5'},
                     svg
                 );
             }

@@ -117,12 +117,13 @@ const ElevationProfile = L.Class.extend({
             this.settings = {
                 towerStart: 0,
                 towerEnd: 0,
+                radioFreq: 868,
             };
         },
 
         getElevationData: function(server, onload = undefined) {
             const that = this;
-            new ElevationProvider(server).get(this.samples)
+            new ElevationProvider(server, false).get(this.samples)
                 .then(function(values) {
                         that.values = values;
                         if (onload) {
@@ -180,8 +181,13 @@ const ElevationProfile = L.Class.extend({
             return this;
         },
 
+        isRadioToolsAvailable: function() {
+            return this.path.length === 2;
+        },
+
         isSightlineVisible: function() {
-            return this.options.sightLine || this.settings.towerStart !== 0 || this.settings.towerEnd !== 0;
+            return this.isRadioToolsAvailable() &&
+                (this.options.sightLine || this.settings.towerStart !== 0 || this.settings.towerEnd !== 0);
         },
 
         setupContainerLayout: function() {
@@ -242,26 +248,44 @@ const ElevationProfile = L.Class.extend({
             this.towerStart.dataset['target'] = 'towerStart';
             this.towerEnd.dataset['target'] = 'towerEnd';
 
-            for (let i = 0; i < config.elevationsServer.length; i++) {
-                const srv = config.elevationsServer[i];
-                const option = L.DomUtil.create('option', '', null);
-                option.value = srv.url;
-                option.text = srv.name;
-                if (srv.url === this.elevationServer) {
-                    option.selected = "yes";
+            const radioRow = this.inputsTable.insertRow();
+            const labelCell = radioRow.insertCell();
+            labelCell.innerText = "Radio frequency (MHz)";
+            const freqCell = radioRow.insertCell();
+            this.radioFreq = L.DomUtil.create('input', '', freqCell);
+            this.radioFreq.type = 'number';
+            this.radioFreq.value = this.settings.radioFreq;
+            this.radioFreq.dataset['target'] = 'radioFreq';
+
+            if (Array.isArray(config.elevationsServer)) {
+                for (let i = 0; i < config.elevationsServer.length; i++) {
+                    const srv = config.elevationsServer[i];
+                    const option = L.DomUtil.create('option', '', null);
+                    option.value = srv.url;
+                    option.text = srv.name;
+                    if (srv.url === this.elevationServer) {
+                        option.selected = "yes";
+                    }
+                    this.providerSelector.add(option);
                 }
-                this.providerSelector.add(option);
+
+                const that = this;
+                this.providerSelector.onchange = function(e) {
+                    that.elevationServer = e.target.value;
+                    that.getElevationData(that.elevationServer, that.updateGraph.bind(that));
+                    return true;
+                };
+            } else {
+                this.providerSelector.style.visibility = 'hidden';
             }
 
-            const that = this;
-            this.providerSelector.onchange = function(e) {
-                that.elevationServer = e.target.value;
-                that.getElevationData(that.elevationServer, that.updateGraph.bind(that));
-                return true;
-            };
+            if (!this.isRadioToolsAvailable()) {
+                this.inputsTable.style.visibility = 'hidden';
+            }
 
             L.DomEvent.on(this.towerStart, 'change', this.onSettingsChange, this);
             L.DomEvent.on(this.towerEnd, 'change', this.onSettingsChange, this);
+            L.DomEvent.on(this.radioFreq, 'change', this.onSettingsChange, this);
         },
 
         onSettingsChange: function(e) {
@@ -284,6 +308,7 @@ const ElevationProfile = L.Class.extend({
             map.removeLayer(this.polyline);
             map.removeLayer(this.trackMarker);
             map.removeLayer(this.polyLineSelection);
+            map.removeLayer(this.intersectionMarker);
             L.DomEvent.off(window, 'resize', this._onWindowResize, this);
             this._map = null;
             this.fire('remove');
@@ -847,6 +872,18 @@ const ElevationProfile = L.Class.extend({
             }
         },
 
+        _buildPath: function(losPoints, horizStep, valueToSvgCoord) {
+            let losPath = [];
+            for (let i = 0; i < losPoints.length; i++) {
+                let cx = i * horizStep;
+                let cy = valueToSvgCoord(losPoints[i]);
+                losPath.push(losPath.length ? 'L' : 'M');
+                losPath.push(cx + ' ' + cy + ' ');
+            }
+            losPath = losPath.join('');
+            return losPath;
+        },
+
         setupGraph: function() {
             if (!this._map || !this.values) {
                 return;
@@ -859,23 +896,43 @@ const ElevationProfile = L.Class.extend({
                 this.leftAxisLables.removeChild(this.leftAxisLables.lastChild);
             }
 
-            let y0 = null;
-            let y1 = null;
-            if (this.values.length > 0) {
-                y0 = this.values[0] + this.settings.towerStart;
-                y1 = this.values[this.values.length - 1] + this.settings.towerEnd;
-            }
-
             var maxValue = Math.max.apply(null, this.values),
                 minValue = Math.min.apply(null, this.values),
                 svg = this.svg,
                 path, i, horizStep, verticalMultiplier, x, y, gridValues, label;
 
-            maxValue = Math.max(maxValue, y0, y1);
-            minValue = Math.min(minValue, y0, y1);
-
             var paddingBottom = 8 + 16,
                 paddingTop = 8;
+
+            // Line of sight, adjusted for curvature
+            let losCorrected = [];
+            let losFrenselCorrected = {
+                top: [],
+                bottom: []
+            };
+            if (this.isSightlineVisible()) {
+                const R = 6371000;
+                const c = 3e8;
+                const f = this.settings.radioFreq * 1000000;
+                const lambda = c / f;
+
+                let h0 = this.values[0] + this.settings.towerStart;
+                let hn = this.values[this.values.length - 1] + this.settings.towerEnd;
+                let dist = this.stats.distance;
+
+                let xvals = Array.from({length: this.values.length}, (_, i) => (i / (this.values.length - 1)) * dist);
+
+                let losLine = xvals.map((d) => h0 + ((hn - h0) / dist) * d);
+                losCorrected = xvals.map((d, i) => losLine[i] - ((d * (dist - d)) / (2 * R)));
+
+                let fresnelRadius = xvals.map((d) => Math.sqrt((lambda * d * (dist - d)) / dist));
+
+                losFrenselCorrected.top = losCorrected.map((y, i) => y + fresnelRadius[i]);
+                losFrenselCorrected.bottom = losCorrected.map((y, i) => y - fresnelRadius[i]);
+
+                minValue = Math.min(minValue, Math.min.apply(null, losCorrected));
+                maxValue = Math.max(maxValue, Math.max.apply(null, losCorrected));
+            }
 
             gridValues = this.calcGridValues(minValue, maxValue);
             var gridStep = (this.svgHeight - paddingBottom - paddingTop) / (gridValues.length - 1);
@@ -920,9 +977,28 @@ const ElevationProfile = L.Class.extend({
             createSvg('path', {'d': path, 'stroke-width': '1px', 'stroke': 'brown', 'fill': 'none'}, svg);
             // sightline
             if (this.isSightlineVisible()) {
-                // 0.5m extra
-                const y1 = this.values[0] + this.settings.towerStart + 0.5;
-                const y2 = this.values[this.values.length - 1] + this.settings.towerEnd + 0.5;
+                const losPath = this._buildPath(losCorrected, horizStep, valueToSvgCoord);
+                const losFresnelTopPath = this._buildPath(losFrenselCorrected.top, horizStep, valueToSvgCoord);
+                const losFresnelBottomPath = this._buildPath(losFrenselCorrected.bottom, horizStep, valueToSvgCoord);
+
+                createSvg('path', {'d': losPath, 'stroke-width': '1px', 'stroke': 'blue', 'fill': 'none'}, svg);
+                createSvg('path', {
+                    'd': losFresnelTopPath,
+                    'stroke-width': '1px',
+                    'stroke-dasharray': '5,5',
+                    'stroke': 'blue',
+                    'fill':
+                    'none'
+                }, svg);
+                createSvg('path', {
+                    'd': losFresnelBottomPath,
+                    'stroke-width': '1px',
+                    'stroke-dasharray': '5,5',
+                    'stroke': 'blue',
+                    'fill': 'none'
+                }, svg);
+                const y1 = this.values[0] + this.settings.towerStart;
+                const y2 = this.values[this.values.length - 1] + this.settings.towerEnd;
                 path = L.Util.template('M{x1} {y1} L{x2} {y2}', {
                         x1: 0,
                         x2: horizStep * this.values.length,
@@ -930,16 +1006,13 @@ const ElevationProfile = L.Class.extend({
                         y2: valueToSvgCoord(y2)
                     }
                 );
-                let strokeColor = '#94b1ff';
                 let intersectX = -1;
-                const visStep = (y2 - y1) / this.values.length;
                 for (i = 0; i < this.values.length; i++) {
                     const yTerrain = this.values[i];
-                    const yVisibility = y1 + (i * visStep);
+                    const yVisibility = losCorrected[i];
 
                     if (yTerrain > yVisibility) {
                         intersectX = i;
-                        strokeColor = '#ff8844';
                         break;
                     }
                 }
@@ -965,11 +1038,6 @@ const ElevationProfile = L.Class.extend({
                         svg
                     );
                 }
-                createSvg(
-                    'path',
-                    {'d': path, 'stroke-width': '2px', 'stroke': strokeColor, 'fill': 'none', 'stroke-opacity': '0.5'},
-                    svg
-                );
             }
         },
 

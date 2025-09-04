@@ -158,6 +158,70 @@ function wgs2lks(lat, lon) {
         return null;
     }
 }
+
+function tksQuarterInc(pos, num, step) {
+    switch (num) {
+        case '1':
+            break;
+        case '2':
+            pos.y += step;
+            break;
+        case '3':
+            pos.x += step;
+            break;
+        case '4':
+            pos.x += step;
+            pos.y += step;
+            break;
+    }
+    return pos;
+}
+
+function tks2wgs(pageNumber) {
+    // Validate format
+    const parts = pageNumber.split("-");
+    if (parts.length !== 3) {
+        throw new Error("Invalid page number format. Use XXXX-XX-XX.");
+    }
+
+    /*
+        Scalw.      Name                Step
+        200_000,    21                  100_000
+        100_000,    211                 50_000
+        50_000,     2111                25_000
+        25_000,     2111.1              12_500
+        10_000,     2111-11             5_000
+        5_000,      2111-11.1           2_500
+        2_000,      2111-11-11          1_000
+        1_000,      2111-11-11.1        500
+        500,        2111-11-11.1.1      250
+
+        3323-33-41
+    */
+
+    let pos = {
+        x: 0,
+        y: 300_000,
+    };
+
+    pos.x += parseInt(parts[0][0] - 1) * 100_000;
+    pos.y += parseInt(parts[0][1] - 1) * 100_000;
+
+    pos = tksQuarterInc(pos, parts[0][2], 50_000);
+    pos = tksQuarterInc(pos, parts[0][3], 25_000);
+
+    pos.x += parseInt(parts[1][0] - 1) * 5_000;
+    pos.y += parseInt(parts[1][1] - 1) * 5_000;
+
+    pos.x += parseInt(parts[2][0] - 1) * 1_000;
+    pos.y += parseInt(parts[2][1] - 1) * 1_000;
+
+    // Center
+    pos.x += 500;
+    pos.y += 500;
+
+    return lks2wgs(pos.x, pos.y);
+}
 /* eslint-enable */
 
-export {lks2wgs, wgs2lks};
+export {lks2wgs, wgs2lks, tks2wgs};

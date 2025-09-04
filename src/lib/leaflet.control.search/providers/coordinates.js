@@ -1,6 +1,6 @@
 import L from 'leaflet';
 
-import {lks2wgs} from '~/lib/lks92';
+import {lks2wgs, tks2wgs} from '~/lib/lks92';
 
 const reInteger = '\\d+';
 const reFractional = '\\d+(?:\\.\\d+)?';
@@ -424,6 +424,68 @@ class CoordinatesLKS92 extends Coordinates {
     }
 }
 
+class CoordinatesTKS93 extends Coordinates {
+    static regexp = new RegExp(`^(${reInteger})-(${reInteger})-(${reInteger})$`, 'u');
+
+    static title = 'TKS93 Coordinates';
+
+    constructor(latDegSigned, lonDegSigned, tksName) {
+        super();
+        Object.assign(this, {latDegSigned, lonDegSigned, tksName});
+    }
+
+    equalTo(other) {
+        return this.latDegSigned === other.latDegSigned && this.lonDegSigned === other.lonDegSigned;
+    }
+
+    isValid() {
+        // aprox bounds from https://epsg.io/3059
+        return (
+            this.latDegSigned >= 55 && this.latDegSigned <= 58.5 && this.lonDegSigned >= 19 && this.lonDegSigned <= 29.5
+        );
+    }
+
+    format() {
+        const latRnd = Math.round(this.latDegSigned * 1000000) / 1000000;
+        const lonRnd = Math.round(this.lonDegSigned * 1000000) / 1000000;
+
+        return {
+            title: `${this.tksName} (1:1000)`,
+            subtitle: `${latRnd}°, ${lonRnd}°`,
+            latitude: `${this.latDegSigned},`,
+            longitude: `${this.lonDegSigned}`,
+        };
+    }
+
+    getLatLng() {
+        return L.latLng(this.latDegSigned, this.lonDegSigned);
+    }
+
+    static fromString(s) {
+        // normalizeInput replaces '-' with ' '
+        const s2 = s.replaceAll(' ', '-');
+        const m = s2.match(CoordinatesTKS93.regexp);
+        if (!m) {
+            return {error: true};
+        }
+        const coords = [];
+        const [d1, d2] = tks2wgs(s2);
+
+        const coord1 = new CoordinatesTKS93(d1, d2, s2);
+        if (coord1.isValid()) {
+            coords.push(coord1);
+        }
+
+        if (coords.length === 0) {
+            return {error: true};
+        }
+        return {
+            coordinates: coords,
+            zoom: 14,
+        };
+    }
+}
+
 class CoordinatesProvider {
     name = 'Coordinates';
 
@@ -441,7 +503,14 @@ class CoordinatesProvider {
         easternHemishphere: /[EeЕе]|[ВвB] *[Дд]?/gu, // second Ее is cyrillic
     };
 
-    static parsers = [CoordinatesDMS, CoordinatesDM, CoordinatesD, CoordinatesDSigned, CoordinatesLKS92];
+    static parsers = [
+        CoordinatesDMS,
+        CoordinatesDM,
+        CoordinatesD,
+        CoordinatesDSigned,
+        CoordinatesLKS92,
+        CoordinatesTKS93,
+    ];
 
     normalizeInput(inp) {
         let s = inp.normalize('NFKC'); // convert subscripts and superscripts to normal chars
@@ -492,7 +561,7 @@ class CoordinatesProvider {
                     return {
                         title: coordStrings.title || `${coordStrings.latitude} ${coordStrings.longitude}`,
                         latlng: it.getLatLng(),
-                        zoom: 17,
+                        zoom: result.zoom || 17,
                         category: parser.title || 'Coordinates',
                         address: null,
                         icon: null,

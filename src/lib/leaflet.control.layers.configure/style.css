@@ -305,3 +305,31 @@
     font-size: 10px;
     color: #B00020;
 }
+
+.leaflet-control-layer-root {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 1px;
+    border-bottom: solid 1px #efefef;
+}
+
+.leaflet-control-layer-label-tint,
+.leaflet-control-layer-label {
+    width: auto;
+    font-size: 0.85em;
+    padding: 0px 1px;
+    margin-right:3px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #efefef;
+}
+
+.leaflet-control-layer-label-tint {
+    border: 1px solid #ccc;
+    background-color: #fffeba;
+    margin-left: 2px;
+}
+
+.leaflet-control-layer-label-title {
+    flex-grow: 1;
+}

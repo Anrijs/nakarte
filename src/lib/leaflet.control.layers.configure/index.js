@@ -8,6 +8,7 @@ import safeLocalStorage from '~/lib/safe-localstorage';
 import './customLayer';
 import config from '~/config';
 import {LeafletCompare} from '~/lib/leaflet.control.compare';
+import {getHotkeyHtml} from '~/lib/leaflet.control.layers.hotkeys';
 
 function enableConfig(control, {layers, customLayersOrder}) {
     const originalOnAdd = control.onAdd;
@@ -818,15 +819,44 @@ function enableConfig(control, {layers, customLayersOrder}) {
 
             _addItem: function(obj) {
                 var label = originalAddItem.call(this, obj);
-                if (obj.layer.__customLayer) {
-                    const editButton = L.DomUtil.create('div', 'layer-extra-button icon-edit', label.children[0]);
-                    editButton.title = 'Edit layer';
-                    L.DomEvent.on(editButton, 'click', (e) =>
-                        this.onCustomLayerEditClicked(obj.layer.__customLayer, e)
-                    );
+
+                // tap into original label
+                const divRoot = label.children[0];
+                if (obj.layer.options.isOverlay) {
+                    divRoot.classList = 'leaflet-control-layer-root';
                 }
+
+                if (obj.layer.meta && obj.layer.meta.name) {
+                    label.children[0].children[1].innerText = obj.layer.meta.name;
+                }
+                if (obj.layer.options.isOverlay) {
+                    label.children[0].children[1].classList = 'leaflet-control-layer-label-title';
+                }
+
+                if (obj.layer.meta && obj.layer.meta.scale) {
+                    const scaleLabel = L.DomUtil.create('div', 'leaflet-control-layer-label-tint');
+                    scaleLabel.innerText = obj.layer.meta.scale;
+                    divRoot.children[0].after(scaleLabel);
+                }
+
+                if (obj.layer.meta && obj.layer.meta.years) {
+                    const yearLabel = L.DomUtil.create('div', 'leaflet-control-layer-label');
+                    yearLabel.innerText = obj.layer.meta.years;
+                    divRoot.children[0].after(yearLabel);
+                }
+
+                const extras = L.DomUtil.create('div', 'leaflet-control-layer-extras', label.children[0]);
+
+                if (obj.layer.options.isOverlay) {
+                    const hotkey = getHotkeyHtml(obj.layer);
+                    if (hotkey) {
+                        const hotkeyBox = L.DomUtil.create('span', '', extras);
+                        hotkeyBox.innerHTML = hotkey;
+                    }
+                }
+
                 if (obj.layer.options.isOverlay && this.compareEnabled) {
-                    const editButton = L.DomUtil.create('div', 'layer-extra-button', label.children[0]);
+                    const editButton = L.DomUtil.create('div', 'layer-extra-button', extras);
                     editButton.title = 'Change side';
                     this.updateCompareButton(obj, editButton);
 
@@ -839,7 +869,7 @@ function enableConfig(control, {layers, customLayersOrder}) {
                     const settingsButton = L.DomUtil.create(
                         'div',
                         'layer-extra-button layer-extra-button-text icon-opacity',
-                        label.children[0]
+                        extras
                     );
                     settingsButton.title = 'Opacity';
 
@@ -852,6 +882,13 @@ function enableConfig(control, {layers, customLayersOrder}) {
                             this.onOpacityEditClicked(obj.layer, opacityValue, e)
                         );
                     }
+                }
+                if (obj.layer.__customLayer) {
+                    const editButton = L.DomUtil.create('div', 'layer-extra-button icon-edit', extras);
+                    editButton.title = 'Edit layer';
+                    L.DomEvent.on(editButton, 'click', (e) =>
+                        this.onCustomLayerEditClicked(obj.layer.__customLayer, e)
+                    );
                 }
                 if (obj.layer._justAdded) {
                     L.DomUtil.addClass(label, 'leaflet-layers-configure-just-added-1');

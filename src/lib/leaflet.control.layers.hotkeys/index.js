@@ -32,28 +32,31 @@ function getLayerModkeys(layer) {
     };
 }
 
-function extendLayerName(name, layer) {
+function getHotkeyHtml(layer) {
+    let ret = '';
     if (layer.options) {
         const hotkey = getLayerHotkey(layer);
         if (hotkey) {
             const modKeys = getLayerModkeys(layer);
-            let extras = "";
             if (modKeys.shift) {
-                extras += '<span class="layers-control-key">Shift</span> + ';
+                ret += '<span class="layers-control-key">Shift</span> + ';
             }
             if (modKeys.ctrl) {
-                extras += '<span class="layers-control-key">Ctrlt</span> + ';
+                ret += '<span class="layers-control-key">Ctrlt</span> + ';
             }
             if (modKeys.alt) {
-                extras += '<span class="layers-control-key">Alt</span> + ';
+                ret += '<span class="layers-control-key">Alt</span> + ';
             }
-            name += `<span class="layers-control-hotkey">`;
-            name += extras;
-            name += `<span class="layers-control-key">${hotkey}</span>`;
-            name += `</span>`;
+            ret = `<span class="layers-control-hotkey">${ret}`;
+            ret += `<span class="layers-control-key">${hotkey}</span>`;
+            ret += `</span>`;
         }
     }
-    return name;
+    return ret;
+}
+
+function extendLayerName(name, layer) {
+    return name + getHotkeyHtml(layer);
 }
 
 function enableHotKeys(control) {
@@ -144,5 +147,5 @@ function enableHotKeys(control) {
     return control;
 }
 
-export default enableHotKeys;
+export {enableHotKeys, getHotkeyHtml};
 

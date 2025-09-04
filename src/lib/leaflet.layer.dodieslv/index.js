@@ -26,9 +26,17 @@ class DodiesLvLayer extends L.Layer {
         return decodeURIComponent(mapped.join(''));
     }
 
-    _setFeaturePopup(geojsonPoint, layer) {
-        const type = geojsonPoint.properties.ti;
+    _getDistText(geojsonPoint) {
+        let distText = '';
+        if (geojsonPoint.properties.ti === 'taka' && geojsonPoint.properties.km) {
+            distText = `${geojsonPoint.properties.km} km`;
+        } else if (geojsonPoint.properties.ti === 'tornis' && geojsonPoint.properties.aug) {
+            distText = `${geojsonPoint.properties.aug} m`;
+        }
+        return distText;
+    }
 
+    _setFeaturePopup(geojsonPoint, layer) {
         const txt = this._b64DecodeUnicode(geojsonPoint.properties.txt);
         const imgsrc = geojsonPoint.properties.img;
 
@@ -61,10 +69,11 @@ class DodiesLvLayer extends L.Layer {
         contents.appendChild(desc);
         contents.appendChild(apraksts);
 
-        if (type === 'taka' && geojsonPoint.properties.km) {
+        const distText = this._getDistText(geojsonPoint);
+        if (distText) {
             const distance = document.createElement('span');
             distance.classList = ['dist'];
-            distance.innerText = `${geojsonPoint.properties.km} km`;
+            distance.innerText = distText;
 
             if (geojsonPoint.properties.ma === 'Pārgājiens') {
                 distance.onclick = this._showRoute.bind(this, geojsonPoint);
@@ -148,8 +157,10 @@ class DodiesLvLayer extends L.Layer {
         });
         const marker = L.marker(latlng, {icon: icon});
 
-        if (type === 'taka' || type === 'pargajiens') {
-            marker.bindTooltip(geojsonPoint.properties.na + ' (' + geojsonPoint.properties.km + ' km)');
+        const distText = this._getDistText(geojsonPoint);
+
+        if (distText) {
+            marker.bindTooltip(geojsonPoint.properties.na + ' (' + distText + ')');
         } else {
             marker.bindTooltip(geojsonPoint.properties.na);
         }

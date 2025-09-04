@@ -118,6 +118,7 @@ const ElevationProfile = L.Class.extend({
                 towerStart: 0,
                 towerEnd: 0,
                 radioFreq: 868,
+                curveRelief: false,
             };
         },
 
@@ -257,6 +258,27 @@ const ElevationProfile = L.Class.extend({
             this.radioFreq.value = this.settings.radioFreq;
             this.radioFreq.dataset['target'] = 'radioFreq';
 
+            let curveEarthLabel = L.DomUtil.create('label', 'elevation-profile-radio', this.leftContainer);
+            let curveSightLabel = L.DomUtil.create('label', 'elevation-profile-radio', this.leftContainer);
+            curveEarthLabel.innerText = 'Curve Earth';
+            curveSightLabel.innerText = 'Curve Sight Line';
+            let curveEarth = L.DomUtil.create('input', '');
+            let curveSight = L.DomUtil.create('input', '');
+            curveEarthLabel.insertBefore(curveEarth, curveEarthLabel.firstChild);
+            curveSightLabel.insertBefore(curveSight, curveSightLabel.firstChild);
+            curveEarth.type = 'radio';
+            curveSight.type = 'radio';
+            curveEarth.name = 'curve_radio';
+            curveSight.name = 'curve_radio';
+            curveEarth.dataset['target'] = 'curveRelief';
+            curveSight.dataset['target'] = 'curveRelief';
+            curveEarth.dataset['inv'] = true;
+            curveSight.checked = !this.settings.curveRelief;
+            curveEarth.checked = this.settings.curveRelief;
+
+            curveEarthLabel.for = curveEarth;
+            curveSightLabel.for = curveSight;
+
             if (Array.isArray(config.elevationsServer)) {
                 for (let i = 0; i < config.elevationsServer.length; i++) {
                     const srv = config.elevationsServer[i];
@@ -286,12 +308,18 @@ const ElevationProfile = L.Class.extend({
             L.DomEvent.on(this.towerStart, 'change', this.onSettingsChange, this);
             L.DomEvent.on(this.towerEnd, 'change', this.onSettingsChange, this);
             L.DomEvent.on(this.radioFreq, 'change', this.onSettingsChange, this);
+            L.DomEvent.on(curveEarth, 'change', this.onSettingsChange, this);
+            L.DomEvent.on(curveSight, 'change', this.onSettingsChange, this);
         },
 
         onSettingsChange: function(e) {
             let value = e.target.value;
             if (e.target.type === 'number') {
                 value = parseFloat(value);
+            }
+            if (e.target.type === 'radio') {
+                const inv = e.target.dataset['inv'] || false;
+                value = (e.target.checked === 'on') !== inv;
             }
             this.settings[e.target.dataset['target']] = value;
             this.updateGraph();
@@ -884,6 +912,13 @@ const ElevationProfile = L.Class.extend({
             return losPath;
         },
 
+        _curveLine: function(xvals, points, distance, inv = false) {
+            const R = 6371000;
+            return xvals.map((d, i) =>
+                points[i] + (inv ? 1 : -1) * ((d * (distance - d)) / (2 * R))
+            );
+        },
+
         setupGraph: function() {
             if (!this._map || !this.values) {
                 return;
@@ -905,40 +940,65 @@ const ElevationProfile = L.Class.extend({
                 paddingTop = 8;
 
             // Line of sight, adjusted for curvature
-            let losCorrected = [];
-            let losFrenselCorrected = {
+            const dist = this.stats.distance;
+            let reliefLine = this.values;
+            let xvals = Array.from({length: this.values.length}, (_, i) => (i / (this.values.length - 1)) * dist);
+            let losLine = [];
+            let losFrensel = {
                 top: [],
                 bottom: []
             };
             if (this.isSightlineVisible()) {
-                const R = 6371000;
                 const c = 3e8;
                 const f = this.settings.radioFreq * 1000000;
                 const lambda = c / f;
 
                 let h0 = this.values[0] + this.settings.towerStart;
                 let hn = this.values[this.values.length - 1] + this.settings.towerEnd;
-                let dist = this.stats.distance;
 
-                let xvals = Array.from({length: this.values.length}, (_, i) => (i / (this.values.length - 1)) * dist);
-
-                let losLine = xvals.map((d) => h0 + ((hn - h0) / dist) * d);
-                losCorrected = xvals.map((d, i) => losLine[i] - ((d * (dist - d)) / (2 * R)));
+                losLine = xvals.map((d) => h0 + ((hn - h0) / dist) * d);
 
                 let fresnelRadius = xvals.map((d) => Math.sqrt((lambda * d * (dist - d)) / dist));
+                losFrensel.top = losLine.map((y, i) => y + fresnelRadius[i]);
+                losFrensel.bottom = losLine.map((y, i) => y - fresnelRadius[i]);
+            }
 
-                losFrenselCorrected.top = losCorrected.map((y, i) => y + fresnelRadius[i]);
-                losFrenselCorrected.bottom = losCorrected.map((y, i) => y - fresnelRadius[i]);
+            if (this.settings.curveRelief) {
+                reliefLine = this._curveLine(xvals, reliefLine, dist, true);
+                minValue = Math.min(minValue, Math.min.apply(null, reliefLine));
+                maxValue = Math.max(maxValue, Math.max.apply(null, reliefLine));
+            } else {
+                losLine = this._curveLine(xvals, losLine, dist);
+                losFrensel.top = this._curveLine(xvals, losFrensel.top, dist);
+                losFrensel.bottom = this._curveLine(xvals, losFrensel.bottom, dist);
+            }
 
-                minValue = Math.min(minValue, Math.min.apply(null, losCorrected));
-                maxValue = Math.max(maxValue, Math.max.apply(null, losCorrected));
+            if (this.isSightlineVisible()) {
+                minValue = Math.min(minValue, Math.min.apply(null, losLine));
+                maxValue = Math.max(maxValue, Math.max.apply(null, losLine));
             }
 
             gridValues = this.calcGridValues(minValue, maxValue);
+            horizStep = this.svgWidth / (this.values.length - 1);
+            verticalMultiplier =
+                (this.svgHeight - paddingTop - paddingBottom) / (gridValues[gridValues.length - 1] - gridValues[0]);
+
+            const valueToSvgCoord = (el) => {
+                const y = (el - gridValues[0]) * verticalMultiplier;
+                return this.svgHeight - y - paddingBottom;
+            };
+
             var gridStep = (this.svgHeight - paddingBottom - paddingTop) / (gridValues.length - 1);
             for (i = 0; i < gridValues.length; i++) {
-                y = Math.round(i * gridStep - 0.5) + 0.5 + paddingTop;
-                path = L.Util.template('M{x1} {y} L{x2} {y}', {x1: 0, x2: this.svgWidth * this.horizZoom, y: y});
+                const y = gridValues[gridValues.length - i - 1];
+
+                let gridLine = xvals.map(() => y);
+                if (this.settings.curveRelief) {
+                    gridLine = this._curveLine(xvals, gridLine, dist, true);
+                }
+
+                path = this._buildPath(gridLine, horizStep, valueToSvgCoord);
+
                 createSvg(
                     'path',
                     {'d': path, 'stroke-width': '1px', 'stroke': 'green', 'fill': 'none', 'stroke-opacity': '0.5'},
@@ -950,19 +1010,10 @@ const ElevationProfile = L.Class.extend({
                 label.style.top = (gridStep * i + paddingTop) + 'px';
             }
 
-            horizStep = this.svgWidth / (this.values.length - 1);
-            verticalMultiplier =
-                (this.svgHeight - paddingTop - paddingBottom) / (gridValues[gridValues.length - 1] - gridValues[0]);
-
             path = [];
-            const valueToSvgCoord = (el) => {
-                const y = (el - gridValues[0]) * verticalMultiplier;
-                return this.svgHeight - y - paddingBottom;
-            };
-
             let startNewSegment = true;
-            for (i = 0; i < this.values.length; i++) {
-                let value = this.values[i];
+            for (i = 0; i < reliefLine.length; i++) {
+                let value = reliefLine[i];
                 if (value === null) {
                     startNewSegment = true;
                     continue;
@@ -977,9 +1028,9 @@ const ElevationProfile = L.Class.extend({
             createSvg('path', {'d': path, 'stroke-width': '1px', 'stroke': 'brown', 'fill': 'none'}, svg);
             // sightline
             if (this.isSightlineVisible()) {
-                const losPath = this._buildPath(losCorrected, horizStep, valueToSvgCoord);
-                const losFresnelTopPath = this._buildPath(losFrenselCorrected.top, horizStep, valueToSvgCoord);
-                const losFresnelBottomPath = this._buildPath(losFrenselCorrected.bottom, horizStep, valueToSvgCoord);
+                const losPath = this._buildPath(losLine, horizStep, valueToSvgCoord);
+                const losFresnelTopPath = this._buildPath(losFrensel.top, horizStep, valueToSvgCoord);
+                const losFresnelBottomPath = this._buildPath(losFrensel.bottom, horizStep, valueToSvgCoord);
 
                 createSvg('path', {'d': losPath, 'stroke-width': '1px', 'stroke': 'blue', 'fill': 'none'}, svg);
                 createSvg('path', {
@@ -997,19 +1048,19 @@ const ElevationProfile = L.Class.extend({
                     'stroke': 'blue',
                     'fill': 'none'
                 }, svg);
-                const y1 = this.values[0] + this.settings.towerStart;
-                const y2 = this.values[this.values.length - 1] + this.settings.towerEnd;
+                const y1 = reliefLine[0] + this.settings.towerStart;
+                const y2 = reliefLine[reliefLine.length - 1] + this.settings.towerEnd;
                 path = L.Util.template('M{x1} {y1} L{x2} {y2}', {
                         x1: 0,
-                        x2: horizStep * this.values.length,
+                        x2: horizStep * reliefLine.length,
                         y1: valueToSvgCoord(y1),
                         y2: valueToSvgCoord(y2)
                     }
                 );
                 let intersectX = -1;
-                for (i = 0; i < this.values.length; i++) {
-                    const yTerrain = this.values[i];
-                    const yVisibility = losCorrected[i];
+                for (i = 0; i < reliefLine.length; i++) {
+                    const yTerrain = reliefLine[i];
+                    const yVisibility = losLine[i];
 
                     if (yTerrain > yVisibility) {
                         intersectX = i;
@@ -1019,7 +1070,7 @@ const ElevationProfile = L.Class.extend({
 
                 this.setIntersectionPostition(intersectX);
                 if (intersectX > 0) {
-                    let x = ((this.svgWidth) / this.values.length) * intersectX;
+                    let x = ((this.svgWidth) / reliefLine.length) * intersectX;
                     let intersectPath = L.Util.template('M{x1} {y1} L{x2} {y2}', {
                         x1: x,
                         x2: x,

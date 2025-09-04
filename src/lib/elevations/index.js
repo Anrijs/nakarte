@@ -10,6 +10,7 @@ class ElevationProvider {
         } else {
             this.url = serverUrl;
         }
+        this.withCredentials = false;
     }
 
     async get(latlngs) {
@@ -17,7 +18,7 @@ class ElevationProvider {
         for (let i = 0; i < latlngs.length; i += this.chunkSize) {
             const chunk = latlngs.slice(i, i + this.chunkSize);
             const request = chunk.map((ll) => `${ll.lat.toFixed(6)} ${ll.lng.toFixed(6)}`).join('\n');
-            const xhr = await fetch(this.url, {method: 'POST', data: request, withCredentials: true});
+            const xhr = await fetch(this.url, {method: 'POST', data: request, withCredentials: self.withCredentials});
             const respValues = xhr.responseText.split('\n').map((line) => (line === 'NULL' ? null : parseFloat(line)));
             result.push(...respValues);
         }

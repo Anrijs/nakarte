@@ -6,6 +6,7 @@ import {MapWithSidebars} from '~/lib/leaflet.map.sidebars';
 import '~/lib/leaflet.control.printPages/control';
 import '~/lib/leaflet.control.caption';
 import config from './config';
+import {MetadataControl} from '~/lib/leaflet.control.metadata';
 import '~/lib/leaflet.control.coordinates';
 import {enableHotKeys} from '~/lib/leaflet.control.layers.hotkeys';
 import '~/lib/leaflet.hashState/Leaflet.Map';
@@ -148,6 +149,9 @@ function setUp() { // eslint-disable-line complexity
     enableLayersMinimize(layersControl);
     enableLayersConfig(layersControl, getLayers(tracklist));
     layersControl.enableHashState('l');
+
+    /* metadata tool */
+    new MetadataControl(layersControl, {position: 'topleft'}).addTo(map);
 
     /* controls bottom-left corner */
 

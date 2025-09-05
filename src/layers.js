@@ -109,6 +109,7 @@ function getLayers(tracklist) {
         attribution: undefined,
         modkey: undefined,
         opacity: undefined,
+        metadata: undefined,
     };
 
     const config = sources.config;
@@ -147,7 +148,36 @@ function getLayers(tracklist) {
                 years: layer.years,
                 scale: layer.scale,
                 layer: undefined,
-                bbox: extras.bbox
+                metadata: extras.metadata,
+                loadMetadata: function() {
+                    // if has metadata url, but loaded - load data
+                    if (!this.metadata || this.layer.meta.data) {
+                        return;
+                    }
+
+                    this.layer.meta.data = {...this.metadata};
+
+                    if (this.metadata.url) {
+                        let url = this.metadata.url;
+                        if (!/^(https?:\/\/|:\/\/)/u.test(url)) {
+                            url = `${config.base}${url}`;
+                        }
+
+                        fetch(url)
+                            .then((response) => {
+                                if (!response.ok) {
+                                    throw new Error(`Failed to get metadata from ${url}`);
+                                }
+                                return response.json();
+                            })
+                            .then((json) => {
+                                this.layer.meta.data = {...this.layer.meta.data, ...json};
+                            })
+                            .catch((error) => {
+                                throw new Error(`Failed to get metadata from ${url}: ${error}`);
+                            });
+                    }
+                }
             };
 
             layer.realurl = layer.url;
@@ -156,6 +186,9 @@ function getLayers(tracklist) {
             }
 
             lyr.layer = getLefletLayer(layer, type, extras);
+            lyr.layer.on("add", function() {
+                lyr.loadMetadata();
+            });
 
             if (lyr.layer) {
                 if (titlesByOrder.includes(title)) {

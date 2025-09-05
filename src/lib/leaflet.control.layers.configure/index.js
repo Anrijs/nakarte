@@ -822,37 +822,44 @@ function enableConfig(control, {layers, customLayersOrder}) {
 
                 // tap into original label
                 const divRoot = label.children[0];
+                divRoot.classList = 'leaflet-control-layer-root';
+                divRoot.children[1].classList = 'leaflet-control-layer-label-title';
+
                 if (obj.layer.options.isOverlay) {
-                    divRoot.classList = 'leaflet-control-layer-root';
+                    divRoot.classList.add('leaflet-control-layer-overlay');
                 }
 
                 if (obj.layer.meta && obj.layer.meta.name) {
-                    label.children[0].children[1].innerText = obj.layer.meta.name;
-                }
-                if (obj.layer.options.isOverlay) {
-                    label.children[0].children[1].classList = 'leaflet-control-layer-label-title';
+                    divRoot.children[1].innerText = obj.layer.meta.name;
                 }
 
+                let metabox = false;
+
                 if (obj.layer.meta && obj.layer.meta.scale) {
-                    const scaleLabel = L.DomUtil.create('div', 'leaflet-control-layer-label-tint');
+                    metabox = true;
+                    const scaleLabel = L.DomUtil.create('span', 'leaflet-control-layer-label-tint');
                     scaleLabel.innerText = obj.layer.meta.scale;
                     divRoot.children[0].after(scaleLabel);
                 }
 
                 if (obj.layer.meta && obj.layer.meta.years) {
+                    metabox = true;
                     const yearLabel = L.DomUtil.create('div', 'leaflet-control-layer-label');
                     yearLabel.innerText = obj.layer.meta.years;
                     divRoot.children[0].after(yearLabel);
                 }
 
+                if (!metabox) {
+                    const spacer = L.DomUtil.create('div', '');
+                    divRoot.children[0].after(spacer);
+                }
+
                 const extras = L.DomUtil.create('div', 'leaflet-control-layer-extras', label.children[0]);
 
-                if (obj.layer.options.isOverlay) {
-                    const hotkey = getHotkeyHtml(obj.layer);
-                    if (hotkey) {
-                        const hotkeyBox = L.DomUtil.create('span', '', extras);
-                        hotkeyBox.innerHTML = hotkey;
-                    }
+                const hotkey = getHotkeyHtml(obj.layer);
+                if (hotkey) {
+                    const hotkeyBox = L.DomUtil.create('span', '', extras);
+                    hotkeyBox.innerHTML = hotkey;
                 }
 
                 if (obj.layer.options.isOverlay && this.compareEnabled) {

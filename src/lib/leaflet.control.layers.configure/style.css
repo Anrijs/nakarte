@@ -309,7 +309,15 @@
 .leaflet-control-layer-root {
     display: flex;
     align-items: flex-start;
-    margin-bottom: 1px;
+    padding: 1px 0;
+}
+
+.leaflet-control-layer-root:hover {
+    background-color: #f3f3f3;
+    cursor: pointer;
+}
+
+.leaflet-control-layer-overlay {
     border-bottom: solid 1px #efefef;
 }
 

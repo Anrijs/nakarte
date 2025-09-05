@@ -5,6 +5,6 @@ deploy
 secrets.js
 _trash
 build_cache
-src/layers.js
+src/sources.js
 src/config.js
 

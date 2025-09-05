@@ -71,6 +71,26 @@ function getLefletLayer(layer, type, extras) {
     }
 }
 
+function decodeHotkey(hotkey) {
+    let modkey = {};
+    while (hotkey && hotkey.length > 1) {
+        const key = hotkey.charAt(0);
+        hotkey = hotkey.slice(1);
+        if (key === '+') {
+            modkey.shift = true;
+        } else if (key === '-') {
+            modkey.alt = true;
+        } else if (key === '^') {
+            modkey.ctrl = true;
+        }
+    }
+
+    return {
+        hotkey,
+        modkey
+    };
+}
+
 function getLayers(tracklist) {
     // generate from sources
     const defaultOptions = {
@@ -111,7 +131,9 @@ function getLayers(tracklist) {
 
             const type = layer.type || "TileLayer";
             const isDefault = layer.isDefault || false;
-            let extras = {...defaultOptions, ...layer.extras || {}};
+            let extras = JSON.parse(JSON.stringify(defaultOptions));
+            Object.assign(extras, layer.extras || {});
+            Object.assign(extras, decodeHotkey(extras.hotkey));
 
             extras.maxNativeZoom = layer.zoom || extras.maxNativeZoom;
             extras.maxZoom = config.maxZoom;

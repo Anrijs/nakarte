@@ -97,9 +97,6 @@ function enableHotKeys(control) {
             },
 
             onKeyDown: function(e) {
-                if (e.altKey || e.ctrlKey) {
-                    return;
-                }
                 this._keyDown = e.keyCode;
             },
 

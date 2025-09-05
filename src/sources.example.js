@@ -48,6 +48,7 @@ const sources = {
                     extras: {
                         print: false,
                         jnx: false,
+                        hotkey: '+T',
                     },
                 },
             ]

@@ -54,15 +54,17 @@ function gradientToAngle(g) {
 
 function pathRegularSamples(latlngs, step) {
     if (!latlngs.length) {
-        return [];
+        return {samples: [], splits: []};
     }
     var samples = [],
+        splits = [],
         lastSampleDist = 0,
         lastPointDistance = 0,
         nextPointDistance = 0,
         segmentLength, i;
 
     samples.push(latlngs[0]);
+    splits.push(0);
     for (i = 1; i < latlngs.length; i++) {
         segmentLength = latlngs[i].distanceTo(latlngs[i - 1]);
         nextPointDistance = lastPointDistance + segmentLength;
@@ -74,12 +76,19 @@ function pathRegularSamples(latlngs, step) {
                 );
             }
         }
+        splits.push(samples.length - 1);
         lastPointDistance = nextPointDistance;
     }
     if (samples.length < 2) {
         samples.push(latlngs[latlngs.length - 1]);
     }
-    return samples;
+    if (splits.length < 2) {
+        splits.push(samples.length);
+    }
+    return {
+        samples: samples,
+        splits: splits
+    };
 }
 
 const ElevationProfile = L.Class.extend({
@@ -94,7 +103,9 @@ const ElevationProfile = L.Class.extend({
             L.setOptions(this, options);
             this.map = map;
             this.path = latlngs;
-            var samples = this.samples = pathRegularSamples(this.path, this.options.samplingInterval);
+            var {samples, splits} = pathRegularSamples(this.path, this.options.samplingInterval);
+            this.samples = samples;
+            this.splits = splits;
             samples = samples.map((latlng) => latlng.wrap());
             if (!samples.length) {
                 notify('Track is empty');
@@ -113,10 +124,10 @@ const ElevationProfile = L.Class.extend({
                 that._addTo(that.map);
             });
 
+            this.intersectionMarkers = {};
+            this.towerHeights = {};
             this.values = null;
             this.settings = {
-                towerStart: 0,
-                towerEnd: 0,
                 radioFreq: 868,
                 curveRelief: false,
             };
@@ -166,14 +177,8 @@ const ElevationProfile = L.Class.extend({
                         '<div class="elevation-profile-marker-label"></div>'
                 }
             );
-            const iconIntersection = L.divIcon({
-                className: 'elevation-profile-marker',
-                html:
-                    '<div class="elevation-profile-marker-intersection-icon"></div>'
-            }
-        );
             this.trackMarker = L.marker([1000, 0], {interactive: false, icon: icon});
-            this.intersectionMarker = L.marker([1000, 0], {interactive: false, icon: iconIntersection});
+            this.intersectionMarkers = {};
             this.polyline = L.polyline(this.path, {weight: 30, opacity: 0}).addTo(map);
             this.polyline.on('mousemove', this.onLineMouseMove, this);
             this.polyline.on('mouseover', this.onLineMouseEnter, this);
@@ -183,12 +188,41 @@ const ElevationProfile = L.Class.extend({
         },
 
         isRadioToolsAvailable: function() {
-            return this.path.length === 2;
+            return this.splits.length <= 11;
+        },
+
+        isTowerHeightSet: function() {
+            return Object.values(this.towerHeights).some((v) => v.value && v.value !== 0);
+        },
+
+        getTowerHeight: function(pos) {
+            if (pos in this.towerHeights) {
+                let val = parseFloat(this.towerHeights[pos].value);
+                if (!isNaN(val)) {
+                    return val;
+                }
+            }
+            return 0;
+        },
+
+        setTowerHeightDom: function(pos, x, y, w) {
+            let heightInput;
+            if (pos in this.towerHeights) {
+                heightInput = this.towerHeights[pos];
+            } else {
+                heightInput = L.DomUtil.create('input', 'elevation-profile-grid-label', this.drawingContainer);
+                heightInput.type = 'number';
+                heightInput.value = '0';
+                this.towerHeights[pos] = heightInput;
+                L.DomEvent.on(heightInput, 'change', this.onSettingsChange, this);
+            }
+            heightInput.style.top = y + 'px';
+            heightInput.style.left = x + 'px';
+            heightInput.style.width = w + 'px';
         },
 
         isSightlineVisible: function() {
-            return this.isRadioToolsAvailable() &&
-                (this.options.sightLine || this.settings.towerStart !== 0 || this.settings.towerEnd !== 0);
+            return this.isRadioToolsAvailable() && (this.options.sightLine || this.isTowerHeightSet());
         },
 
         setupContainerLayout: function() {
@@ -231,23 +265,6 @@ const ElevationProfile = L.Class.extend({
             L.DomEvent.on(window, 'resize', this._onWindowResize, this);
 
             this.inputsTable = L.DomUtil.create('table', 'elevation-profile-inputs', this.leftContainer);
-            this.inputsTable.innerHTML = `
-                <table class="elevation-profile-inputs">
-                <tr class="start-group"><td>Tower Start (m)</td><td>Tower End (m)</td></tr>
-                </table>
-                `;
-
-            const inputRow = this.inputsTable.insertRow();
-            const startCell = inputRow.insertCell();
-            const endCell = inputRow.insertCell();
-            this.towerStart = L.DomUtil.create('input', '', startCell);
-            this.towerEnd = L.DomUtil.create('input', '', endCell);
-            this.towerStart.type = 'number';
-            this.towerEnd.type = 'number';
-            this.towerStart.value = this.settings.towerStart;
-            this.towerEnd.value = this.settings.towerEnd;
-            this.towerStart.dataset['target'] = 'towerStart';
-            this.towerEnd.dataset['target'] = 'towerEnd';
 
             const radioRow = this.inputsTable.insertRow();
             const labelCell = radioRow.insertCell();
@@ -258,26 +275,26 @@ const ElevationProfile = L.Class.extend({
             this.radioFreq.value = this.settings.radioFreq;
             this.radioFreq.dataset['target'] = 'radioFreq';
 
-            let curveEarthLabel = L.DomUtil.create('label', 'elevation-profile-radio', this.leftContainer);
-            let curveSightLabel = L.DomUtil.create('label', 'elevation-profile-radio', this.leftContainer);
-            curveEarthLabel.innerText = 'Curve Earth';
-            curveSightLabel.innerText = 'Curve Sight Line';
-            let curveEarth = L.DomUtil.create('input', '');
-            let curveSight = L.DomUtil.create('input', '');
-            curveEarthLabel.insertBefore(curveEarth, curveEarthLabel.firstChild);
-            curveSightLabel.insertBefore(curveSight, curveSightLabel.firstChild);
-            curveEarth.type = 'radio';
-            curveSight.type = 'radio';
-            curveEarth.name = 'curve_radio';
-            curveSight.name = 'curve_radio';
-            curveEarth.dataset['target'] = 'curveRelief';
-            curveSight.dataset['target'] = 'curveRelief';
-            curveEarth.dataset['inv'] = true;
-            curveSight.checked = !this.settings.curveRelief;
-            curveEarth.checked = this.settings.curveRelief;
+            this.curveEarthLabel = L.DomUtil.create('label', 'elevation-profile-radio', this.leftContainer);
+            this.curveSightLabel = L.DomUtil.create('label', 'elevation-profile-radio', this.leftContainer);
+            this.curveEarthLabel.innerText = 'Curve Earth';
+            this.curveSightLabel.innerText = 'Curve Sight Line';
+            this.curveEarth = L.DomUtil.create('input', '');
+            this.curveSight = L.DomUtil.create('input', '');
+            this.curveEarthLabel.insertBefore(this.curveEarth, this.curveEarthLabel.firstChild);
+            this.curveSightLabel.insertBefore(this.curveSight, this.curveSightLabel.firstChild);
+            this.curveEarth.type = 'radio';
+            this.curveSight.type = 'radio';
+            this.curveEarth.name = 'curve_radio';
+            this.curveSight.name = 'curve_radio';
+            this.curveEarth.dataset['target'] = 'curveRelief';
+            this.curveSight.dataset['target'] = 'curveRelief';
+            this.curveEarth.dataset['inv'] = true;
+            this.curveSight.checked = !this.settings.curveRelief;
+            this.curveEarth.checked = this.settings.curveRelief;
 
-            curveEarthLabel.for = curveEarth;
-            curveSightLabel.for = curveSight;
+            this.curveEarthLabel.for = this.curveEarth;
+            this.curveSightLabel.for = this.curveSight;
 
             if (Array.isArray(config.elevationsServer)) {
                 for (let i = 0; i < config.elevationsServer.length; i++) {
@@ -303,13 +320,15 @@ const ElevationProfile = L.Class.extend({
 
             if (!this.isRadioToolsAvailable()) {
                 this.inputsTable.style.visibility = 'hidden';
+                this.curveEarth.style.visibility = 'hidden';
+                this.curveSight.style.visibility = 'hidden';
+                this.curveEarthLabel.style.visibility = 'hidden';
+                this.curveSightLabel.style.visibility = 'hidden';
             }
 
-            L.DomEvent.on(this.towerStart, 'change', this.onSettingsChange, this);
-            L.DomEvent.on(this.towerEnd, 'change', this.onSettingsChange, this);
             L.DomEvent.on(this.radioFreq, 'change', this.onSettingsChange, this);
-            L.DomEvent.on(curveEarth, 'change', this.onSettingsChange, this);
-            L.DomEvent.on(curveSight, 'change', this.onSettingsChange, this);
+            L.DomEvent.on(this.curveEarth, 'change', this.onSettingsChange, this);
+            L.DomEvent.on(this.curveSight, 'change', this.onSettingsChange, this);
         },
 
         onSettingsChange: function(e) {
@@ -336,7 +355,10 @@ const ElevationProfile = L.Class.extend({
             map.removeLayer(this.polyline);
             map.removeLayer(this.trackMarker);
             map.removeLayer(this.polyLineSelection);
-            map.removeLayer(this.intersectionMarker);
+            Object.entries(this.intersectionMarkers).forEach(([_unused, v]) => {
+                map.removeLayer(v);
+            });
+            this.intersectionMarkers = {};
             L.DomEvent.off(window, 'resize', this._onWindowResize, this);
             this._map = null;
             this.fire('remove');
@@ -726,21 +748,35 @@ const ElevationProfile = L.Class.extend({
             return stats;
         },
 
-        setIntersectionPostition: function(ind) {
+        setIntersectionPostition: function(id, pos, xOffset) {
             if (!this._map || !this.values) {
                 return;
             }
+
+            let marker = null;
+            if (id in this.intersectionMarkers) {
+                marker = this.intersectionMarkers[id];
+            } else {
+                const iconIntersection = L.divIcon({
+                    className: 'elevation-profile-marker',
+                    html:
+                        '<div class="elevation-profile-marker-intersection-icon"></div>'
+                });
+                marker = L.marker([1000, 0], {interactive: false, icon: iconIntersection});
+                this.intersectionMarkers[id] = marker;
+            }
+
             let markerPos;
-            if (ind < 0) {
-                this._map.removeLayer(this.intersectionMarker);
+            if (pos < 0 || (pos + xOffset) < 0) {
+                this._map.removeLayer(marker);
                 return;
-            } else if (ind >= this.samples.length - 1) {
+            } else if ((pos + xOffset) >= this.samples.length - 1) {
                 markerPos = this.samples[this.samples.length - 1];
             } else {
-                markerPos = this.samples[ind];
+                markerPos = this.samples[pos + xOffset];
             }
-            this.intersectionMarker.setLatLng(markerPos);
-            this._map.addLayer(this.intersectionMarker);
+            marker.setLatLng(markerPos);
+            this._map.addLayer(marker);
         },
 
         setCursorPosition: function(ind) {
@@ -900,10 +936,10 @@ const ElevationProfile = L.Class.extend({
             }
         },
 
-        _buildPath: function(losPoints, horizStep, valueToSvgCoord) {
+        _buildPath: function(losPoints, horizStep, valueToSvgCoord, xOffset = 0) {
             let losPath = [];
             for (let i = 0; i < losPoints.length; i++) {
-                let cx = i * horizStep;
+                let cx = (xOffset + i) * horizStep;
                 let cy = valueToSvgCoord(losPoints[i]);
                 losPath.push(losPath.length ? 'L' : 'M');
                 losPath.push(cx + ' ' + cy + ' ');
@@ -919,6 +955,7 @@ const ElevationProfile = L.Class.extend({
             );
         },
 
+        // eslint-disable-next-line complexity
         setupGraph: function() {
             if (!this._map || !this.values) {
                 return;
@@ -940,42 +977,89 @@ const ElevationProfile = L.Class.extend({
                 paddingTop = 8;
 
             // Line of sight, adjusted for curvature
-            const dist = this.stats.distance;
-            let reliefLine = this.values;
-            let xvals = Array.from({length: this.values.length}, (_, i) => (i / (this.values.length - 1)) * dist);
-            let losLine = [];
-            let losFrensel = {
-                top: [],
-                bottom: []
-            };
-            if (this.isSightlineVisible()) {
-                const c = 3e8;
-                const f = this.settings.radioFreq * 1000000;
-                const lambda = c / f;
+            let splitLines = [];
+            let reliefLine = [];
 
-                let h0 = this.values[0] + this.settings.towerStart;
-                let hn = this.values[this.values.length - 1] + this.settings.towerEnd;
+            // sight line consts
+            const c = 3e8;
+            const f = this.settings.radioFreq * 1000000;
+            const lambda = c / f;
 
-                losLine = xvals.map((d) => h0 + ((hn - h0) / dist) * d);
-
-                let fresnelRadius = xvals.map((d) => Math.sqrt((lambda * d * (dist - d)) / dist));
-                losFrensel.top = losLine.map((y, i) => y + fresnelRadius[i]);
-                losFrensel.bottom = losLine.map((y, i) => y - fresnelRadius[i]);
+            if (!this.isRadioToolsAvailable()) {
+                // reduce to 1
+                this.splits = [0, this.values.length - 1];
             }
 
-            if (this.settings.curveRelief) {
-                reliefLine = this._curveLine(xvals, reliefLine, dist, true);
-                minValue = Math.min(minValue, Math.min.apply(null, reliefLine));
-                maxValue = Math.max(maxValue, Math.max.apply(null, reliefLine));
-            } else {
-                losLine = this._curveLine(xvals, losLine, dist);
-                losFrensel.top = this._curveLine(xvals, losFrensel.top, dist);
-                losFrensel.bottom = this._curveLine(xvals, losFrensel.bottom, dist);
-            }
+            // Use splits
+            for (i = 1; i < this.splits.length; i++) {
+                let splitStart = this.splits[i - 1];
+                let splitEnd = this.splits[i];
+                const extend = i + 1 < this.splits.length;
+                const splitSize = splitEnd - splitStart;
 
-            if (this.isSightlineVisible()) {
-                minValue = Math.min(minValue, Math.min.apply(null, losLine));
-                maxValue = Math.max(maxValue, Math.max.apply(null, losLine));
+                if (extend) {
+                    splitEnd += 1;
+                }
+
+                const firstSample = L.latLng(this.samples[splitStart]);
+                const lastSample = L.latLng(this.samples[splitEnd]);
+                const splitDist = firstSample.distanceTo(lastSample);
+
+                let slicedValues = this.values.slice(splitStart, splitEnd);
+                let slicedXValues = Array.from(
+                    {length: slicedValues.length},
+                    (_, j) => (j / (slicedValues.length - 1)) * splitDist
+                );
+
+                let splitReliefLine = slicedValues;
+                let splitLosLine = [];
+                let losFrensel = {
+                    top: [],
+                    bottom: []
+                };
+                let slicedMaxValue = Math.max.apply(null, slicedValues);
+                let slicedMinValue = Math.min.apply(null, slicedValues);
+
+                if (this.isSightlineVisible()) {
+                    let h0 = slicedValues[0] + this.getTowerHeight(i - 1);
+                    let hn = slicedValues[slicedValues.length - 1] + this.getTowerHeight(i);
+                    splitLosLine = slicedXValues.map((d) => h0 + ((hn - h0) / splitDist) * d);
+
+                    let fresnelRadius = slicedXValues.map((d) => Math.sqrt((lambda * d * (splitDist - d)) / splitDist));
+                    losFrensel.top = splitLosLine.map((y, i) => y + fresnelRadius[i]);
+                    losFrensel.bottom = splitLosLine.map((y, i) => y - fresnelRadius[i]);
+                }
+
+                if (this.settings.curveRelief) {
+                    splitReliefLine = this._curveLine(slicedXValues, splitReliefLine, splitDist, true);
+                    slicedMinValue = Math.min(slicedMinValue, Math.min.apply(null, splitReliefLine));
+                    slicedMaxValue = Math.max(slicedMaxValue, Math.max.apply(null, splitReliefLine));
+                } else {
+                    splitLosLine = this._curveLine(slicedXValues, splitLosLine, splitDist);
+                    losFrensel.top = this._curveLine(slicedXValues, losFrensel.top, splitDist);
+                    losFrensel.bottom = this._curveLine(slicedXValues, losFrensel.bottom, splitDist);
+                }
+
+                if (this.isSightlineVisible()) {
+                    slicedMinValue = Math.min(slicedMinValue, Math.min.apply(null, splitLosLine));
+                    slicedMaxValue = Math.max(slicedMaxValue, Math.max.apply(null, splitLosLine));
+                }
+
+                minValue = Math.min(slicedMinValue, minValue);
+                maxValue = Math.max(slicedMaxValue, maxValue);
+
+                splitReliefLine.pop();
+
+                reliefLine.push(...splitReliefLine);
+                splitLines.push({
+                    line: splitLosLine,
+                    frensel: losFrensel,
+                    xvals: slicedXValues,
+                    dist: splitDist,
+                    start: splitStart,
+                    end: splitEnd,
+                    size: splitSize
+                });
             }
 
             gridValues = this.calcGridValues(minValue, maxValue);
@@ -987,28 +1071,6 @@ const ElevationProfile = L.Class.extend({
                 const y = (el - gridValues[0]) * verticalMultiplier;
                 return this.svgHeight - y - paddingBottom;
             };
-
-            var gridStep = (this.svgHeight - paddingBottom - paddingTop) / (gridValues.length - 1);
-            for (i = 0; i < gridValues.length; i++) {
-                const y = gridValues[gridValues.length - i - 1];
-
-                let gridLine = xvals.map(() => y);
-                if (this.settings.curveRelief) {
-                    gridLine = this._curveLine(xvals, gridLine, dist, true);
-                }
-
-                path = this._buildPath(gridLine, horizStep, valueToSvgCoord);
-
-                createSvg(
-                    'path',
-                    {'d': path, 'stroke-width': '1px', 'stroke': 'green', 'fill': 'none', 'stroke-opacity': '0.5'},
-                    svg
-                );
-
-                label = L.DomUtil.create('div', 'elevation-profile-grid-label', this.leftAxisLables);
-                label.innerHTML = gridValues[gridValues.length - i - 1];
-                label.style.top = (gridStep * i + paddingTop) + 'px';
-            }
 
             path = [];
             let startNewSegment = true;
@@ -1026,69 +1088,161 @@ const ElevationProfile = L.Class.extend({
             }
             path = path.join('');
             createSvg('path', {'d': path, 'stroke-width': '1px', 'stroke': 'brown', 'fill': 'none'}, svg);
-            // sightline
-            if (this.isSightlineVisible()) {
-                const losPath = this._buildPath(losLine, horizStep, valueToSvgCoord);
-                const losFresnelTopPath = this._buildPath(losFrensel.top, horizStep, valueToSvgCoord);
-                const losFresnelBottomPath = this._buildPath(losFrensel.bottom, horizStep, valueToSvgCoord);
 
-                createSvg('path', {'d': losPath, 'stroke-width': '1px', 'stroke': 'blue', 'fill': 'none'}, svg);
-                createSvg('path', {
-                    'd': losFresnelTopPath,
-                    'stroke-width': '1px',
-                    'stroke-dasharray': '5,5',
-                    'stroke': 'blue',
-                    'fill':
-                    'none'
-                }, svg);
-                createSvg('path', {
-                    'd': losFresnelBottomPath,
-                    'stroke-width': '1px',
-                    'stroke-dasharray': '5,5',
-                    'stroke': 'blue',
-                    'fill': 'none'
-                }, svg);
-                const y1 = reliefLine[0] + this.settings.towerStart;
-                const y2 = reliefLine[reliefLine.length - 1] + this.settings.towerEnd;
-                path = L.Util.template('M{x1} {y1} L{x2} {y2}', {
-                        x1: 0,
-                        x2: horizStep * reliefLine.length,
-                        y1: valueToSvgCoord(y1),
-                        y2: valueToSvgCoord(y2)
-                    }
+            const drawSplit = (x) => {
+                let splitPath = L.Util.template('M{x1} {y1} L{x2} {y2}', {
+                    x1: x,
+                    x2: x,
+                    y1: 0,
+                    y2: this.svgHeight
+                });
+                createSvg(
+                    'path',
+                    {
+                        'd': splitPath,
+                        'stroke-width': '2px',
+                        'stroke': '#aa11ff',
+                        'fill': 'none',
+                        'stroke-opacity': '0.35'
+                    },
+                    svg
                 );
-                let intersectX = -1;
-                for (i = 0; i < reliefLine.length; i++) {
-                    const yTerrain = reliefLine[i];
-                    const yVisibility = losLine[i];
+            };
 
-                    if (yTerrain > yVisibility) {
-                        intersectX = i;
-                        break;
-                    }
+            // Split lines
+            let losOffset = 0;
+            for (i = 0; i < splitLines.length; i++) {
+                let los = splitLines[i];
+                let losLine = los.line;
+                let losFrensel = los.frensel;
+                let splitXvals = los.xvals;
+                let splitDist = los.dist;
+                let splitStart = los.start;
+                let splitEnd = los.end;
+                let splitSize = los.size;
+                let isLast = (i + 1) === splitLines.length;
+
+                // Vertical split line
+                let x = ((this.svgWidth) / reliefLine.length) * splitStart;
+                if (splitLines.length > 1 && i < splitLines.length) {
+                    drawSplit(x);
                 }
 
-                this.setIntersectionPostition(intersectX);
-                if (intersectX > 0) {
-                    let x = ((this.svgWidth) / reliefLine.length) * intersectX;
-                    let intersectPath = L.Util.template('M{x1} {y1} L{x2} {y2}', {
-                        x1: x,
-                        x2: x,
-                        y1: 0,
-                        y2: this.svgHeight
-                    });
+                let inw = 60;
+                if (i !== 0) {
+                    x -= (inw / 2);
+                }
+
+                this.setTowerHeightDom(i, x, paddingTop, inw);
+
+                // add end input
+                if (isLast) {
+                    let x = ((this.svgWidth) / reliefLine.length) * splitEnd;
+                    drawSplit(x);
+
+                    x -= (inw + 8);
+                    this.setTowerHeightDom(i + 1, x, paddingTop, inw);
+                }
+
+                // Horizontal elevation lines
+                var gridStep = (this.svgHeight - paddingBottom - paddingTop) / (gridValues.length - 1);
+                for (let j = 0; j < gridValues.length; j++) {
+                    const y = gridValues[gridValues.length - j - 1];
+
+                    let gridLine = splitXvals.map(() => y);
+                    if (this.settings.curveRelief) {
+                        gridLine = this._curveLine(splitXvals, gridLine, splitDist, true);
+                    }
+
+                    path = this._buildPath(gridLine, horizStep, valueToSvgCoord, losOffset);
+
                     createSvg(
                         'path',
-                        {
-                            'd': intersectPath,
-                            'stroke-width': '1px',
-                            'stroke': '#ff4411',
-                            'fill': 'none',
-                            'stroke-opacity': '0.8'
-                        },
+                        {'d': path, 'stroke-width': '1px', 'stroke': 'green', 'fill': 'none', 'stroke-opacity': '0.5'},
                         svg
                     );
+
+                    if (i === 0) {
+                        label = L.DomUtil.create('div', 'elevation-profile-grid-label', this.leftAxisLables);
+                        label.innerHTML = gridValues[gridValues.length - j - 1];
+                        label.style.top = (gridStep * j + paddingTop) + 'px';
+                    }
                 }
+
+                // LOS lines
+                if (this.isSightlineVisible()) {
+                    const losPath = this._buildPath(losLine, horizStep, valueToSvgCoord, losOffset);
+                    const losFresnelTopPath = this._buildPath(losFrensel.top, horizStep, valueToSvgCoord, losOffset);
+                    const losFresnelBottomPath = this._buildPath(
+                        losFrensel.bottom,
+                        horizStep,
+                        valueToSvgCoord,
+                        losOffset
+                    );
+
+                    createSvg('path', {'d': losPath, 'stroke-width': '1px', 'stroke': 'blue', 'fill': 'none'}, svg);
+                    createSvg('path', {
+                        'd': losFresnelTopPath,
+                        'stroke-width': '1px',
+                        'stroke-dasharray': '5,5',
+                        'stroke': 'blue',
+                        'fill':
+                        'none'
+                    }, svg);
+                    createSvg('path', {
+                        'd': losFresnelBottomPath,
+                        'stroke-width': '1px',
+                        'stroke-dasharray': '5,5',
+                        'stroke': 'blue',
+                        'fill': 'none'
+                    }, svg);
+
+                    const y1 = reliefLine[0] + this.settings.towerStart;
+                    const y2 = reliefLine[reliefLine.length - 1] + this.settings.towerEnd;
+                    path = L.Util.template('M{x1} {y1} L{x2} {y2}', {
+                            x1: 0,
+                            x2: horizStep * reliefLine.length,
+                            y1: valueToSvgCoord(y1),
+                            y2: valueToSvgCoord(y2)
+                        }
+                    );
+
+                    // intersections
+                    let intersectX = -1;
+                    for (let j = 0; j < reliefLine.length; j++) {
+                        const yTerrain = reliefLine[j + losOffset];
+                        const yVisibility = losLine[j];
+
+                        if (yTerrain > yVisibility) {
+                            intersectX = j;
+                            break;
+                        }
+                    }
+
+                    this.setIntersectionPostition(i, intersectX, losOffset); // TODO: change to add
+                    if (intersectX > 0) {
+                        let x = ((this.svgWidth) / reliefLine.length) * (intersectX + losOffset);
+                        let intersectPath = L.Util.template('M{x1} {y1} L{x2} {y2}', {
+                            x1: x,
+                            x2: x,
+                            y1: 0,
+                            y2: this.svgHeight
+                        });
+                        createSvg(
+                            'path',
+                            {
+                                'd': intersectPath,
+                                'stroke-width': '1px',
+                                'stroke': '#ff4411',
+                                'fill': 'none',
+                                'stroke-opacity': '0.8'
+                            },
+                            svg
+                        );
+                    }
+                }
+
+                losOffset += splitSize;
             }
         },
 

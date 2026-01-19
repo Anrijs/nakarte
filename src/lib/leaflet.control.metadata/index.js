@@ -81,6 +81,14 @@ const MetadataControl = L.Control.extend({
             };
         }
 
+        function createDownloadItem(url, options = {}) {
+            return {
+                text: `<span class="leaflet-coordinates-menu-fmt">${url}</span>`,
+                callback: () => window.open(url),
+                ...options,
+            };
+        }
+
         const items = [];
         const latlon = e.latlng;
         for (const l of this.layersControl._layers) {
@@ -103,8 +111,18 @@ const MetadataControl = L.Control.extend({
                     );
                     layerAdded = true;
                 }
-                items.push(createItem('', {text: `Filename: ${bbox.name}`}));
-                items.push(createItem('', {text: `Year: ${bbox.year}`}));
+                if (bbox.name) {
+                    if (bbox.url) {
+                        items.push(createDownloadItem(bbox.url, {text: `Fails: <u>${bbox.name}</u>`}));
+                    } else {
+                        items.push(createItem(bbox.name, {text: `Fails: ${bbox.name}`}));
+                    }
+                } else {
+                    continue;
+                }
+                if (bbox.year) {
+                    items.push(createItem(bbox.year, {text: ` - Gads: ${bbox.year}`}));
+                }
             }
         }
 
